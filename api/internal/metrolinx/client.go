@@ -42,7 +42,8 @@ func (c *Client) Fetch(ctx context.Context, path string) ([]byte, error) {
 		return nil, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, path)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	const maxBodyBytes = 10 * 1024 * 1024 // 10 MB
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("reading response: %w", err)
 	}

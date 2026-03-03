@@ -1,61 +1,69 @@
 <!-- web/src/routes/map/+page.svelte -->
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 	import { env } from '$env/dynamic/public';
 
 	let { data } = $props();
 	let mapContainer: HTMLDivElement;
 	let map: any;
+	let markers: any[] = [];
+	let mapboxgl: any;
+
+	function updateMarkers() {
+		if (!map || !mapboxgl) return;
+
+		markers.forEach((m) => m.remove());
+		markers = [];
+
+		if ((data.positions as any)?.entity) {
+			for (const entity of (data.positions as any).entity) {
+				const vp = entity.vehicle?.position;
+				if (vp?.latitude && vp?.longitude) {
+					const m = new mapboxgl.Marker({ color: '#15803d' })
+						.setLngLat([vp.longitude, vp.latitude])
+						.setPopup(
+							new mapboxgl.Popup().setHTML(
+								`<strong>Trip ${entity.vehicle?.trip?.tripId || '—'}</strong><br/>
+								 Route: ${entity.vehicle?.trip?.routeId || '—'}`
+							)
+						)
+						.addTo(map);
+					markers.push(m);
+				}
+			}
+		}
+	}
 
 	onMount(() => {
-		let interval: ReturnType<typeof setInterval>;
-
 		(async () => {
-			const mapboxgl = (await import('mapbox-gl')).default;
+			mapboxgl = (await import('mapbox-gl')).default;
 
 			mapboxgl.accessToken = env.PUBLIC_MAPBOX_TOKEN || '';
 
 			map = new mapboxgl.Map({
 				container: mapContainer,
 				style: 'mapbox://styles/mapbox/light-v11',
-				center: [-79.38, 43.65], // Toronto
+				center: [-79.38, 43.65],
 				zoom: 9
 			});
 
 			map.addControl(new mapboxgl.NavigationControl());
-
-			if ((data.positions as any)?.entity) {
-				for (const entity of (data.positions as any).entity) {
-					const vp = entity.vehicle?.position;
-					if (vp?.latitude && vp?.longitude) {
-						new mapboxgl.Marker({ color: '#15803d' })
-							.setLngLat([vp.longitude, vp.latitude])
-							.setPopup(
-								new mapboxgl.Popup().setHTML(
-									`<strong>Trip ${entity.vehicle?.trip?.tripId || '—'}</strong><br/>
-									 Route: ${entity.vehicle?.trip?.routeId || '—'}`
-								)
-							)
-							.addTo(map);
-					}
-				}
-			}
-
-			// Poll for updates
-			interval = setInterval(async () => {
-				try {
-					await fetch('/map/__data.json?x-sveltekit-invalidated=1');
-					// SvelteKit will re-run the load function
-				} catch {
-					/* ignore */
-				}
-			}, 15_000);
+			updateMarkers();
 		})();
+
+		const interval = setInterval(() => invalidateAll(), 15_000);
 
 		return () => {
 			clearInterval(interval);
+			markers.forEach((m) => m.remove());
 			map?.remove();
 		};
+	});
+
+	$effect(() => {
+		data.positions;
+		updateMarkers();
 	});
 </script>
 

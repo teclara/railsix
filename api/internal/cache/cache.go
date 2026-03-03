@@ -1,4 +1,3 @@
-// api/internal/cache/cache.go
 package cache
 
 import (
@@ -17,7 +16,9 @@ type Cache struct {
 }
 
 func New() *Cache {
-	return &Cache{entries: make(map[string]entry)}
+	c := &Cache{entries: make(map[string]entry)}
+	go c.evictLoop(5 * time.Minute)
+	return c
 }
 
 func (c *Cache) Set(key string, data []byte, ttl time.Duration) {
@@ -45,4 +46,18 @@ func (c *Cache) GetStale(key string) ([]byte, bool) {
 		return nil, false
 	}
 	return e.data, true
+}
+
+func (c *Cache) evictLoop(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	for range ticker.C {
+		c.mu.Lock()
+		now := time.Now()
+		for k, e := range c.entries {
+			if now.After(e.expiresAt) {
+				delete(c.entries, k)
+			}
+		}
+		c.mu.Unlock()
+	}
 }

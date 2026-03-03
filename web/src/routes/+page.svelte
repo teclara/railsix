@@ -2,16 +2,14 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
+	import { defaultStation } from '$lib/stores/favorites';
 	import StationPicker from '$lib/components/StationPicker.svelte';
 
 	let { data } = $props();
 
 	$effect(() => {
-		if (browser) {
-			const saved = localStorage.getItem('defaultStation');
-			if (saved) {
-				goto(`/departures/${saved}`);
-			}
+		if (browser && $defaultStation) {
+			goto(`/departures/${$defaultStation}`);
 		}
 	});
 </script>

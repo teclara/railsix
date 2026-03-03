@@ -1,7 +1,11 @@
 // web/src/lib/api.ts
 import { env } from '$env/dynamic/private';
+import { dev } from '$app/environment';
 
-const baseUrl = env.API_BASE_URL || 'http://localhost:8080';
+const baseUrl = env.API_BASE_URL || (dev ? 'http://localhost:8080' : '');
+if (!baseUrl) {
+	throw new Error('API_BASE_URL environment variable is required in production');
+}
 
 async function fetchApi<T>(path: string): Promise<T> {
 	const res = await fetch(`${baseUrl}${path}`);
