@@ -1,33 +1,25 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"regexp"
 	"time"
 
-	"github.com/teclara/sixrail/api/internal/cache"
 	gtfsstore "github.com/teclara/sixrail/api/internal/gtfs"
 	"github.com/teclara/sixrail/api/internal/models"
 )
 
 var stopCodeRe = regexp.MustCompile(`^[A-Za-z0-9]{2,10}$`)
 
-type Fetcher interface {
-	Fetch(ctx context.Context, path string) ([]byte, error)
-}
-
 type Handlers struct {
-	fetcher Fetcher
-	cache   *cache.Cache
-	static  *gtfsstore.StaticStore
-	rt      *gtfsstore.RealtimeCache
+	static *gtfsstore.StaticStore
+	rt     *gtfsstore.RealtimeCache
 }
 
-func New(fetcher Fetcher, cache *cache.Cache, static *gtfsstore.StaticStore, rt *gtfsstore.RealtimeCache) *Handlers {
-	return &Handlers{fetcher: fetcher, cache: cache, static: static, rt: rt}
+func New(static *gtfsstore.StaticStore, rt *gtfsstore.RealtimeCache) *Handlers {
+	return &Handlers{static: static, rt: rt}
 }
 
 func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
@@ -80,37 +72,13 @@ func (h *Handlers) Alerts(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, alerts)
 }
 
-// StopDepartures still proxies via the Metrolinx REST API (no GTFS-RT equivalent).
+// StopDepartures returns GTFS-based departures for a stop code.
 func (h *Handlers) StopDepartures(w http.ResponseWriter, r *http.Request) {
 	stopCode := r.PathValue("stopCode")
 	if !stopCodeRe.MatchString(stopCode) {
 		jsonError(w, "invalid stop code", http.StatusBadRequest)
 		return
 	}
-	h.cachedProxy(w, r, "/Stop/NextService/"+stopCode, 30*time.Second)
-}
-
-func (h *Handlers) cachedProxy(w http.ResponseWriter, r *http.Request, metrolinxPath string, ttl time.Duration) {
-	if data, ok := h.cache.Get(metrolinxPath); ok {
-		w.Header().Set("X-Cache", "HIT")
-		writeJSON(w, http.StatusOK, data)
-		return
-	}
-
-	data, err := h.fetcher.Fetch(r.Context(), metrolinxPath)
-	if err != nil {
-		slog.Error("metrolinx fetch failed", "path", metrolinxPath, "error", err)
-		if stale, ok := h.cache.GetStale(metrolinxPath); ok {
-			w.Header().Set("X-Cache", "STALE")
-			w.Header().Set("X-Cache-Stale", "true")
-			writeJSON(w, http.StatusOK, stale)
-			return
-		}
-		jsonError(w, "upstream unavailable", http.StatusBadGateway)
-		return
-	}
-
-	h.cache.Set(metrolinxPath, data, ttl)
-	w.Header().Set("X-Cache", "MISS")
-	writeJSON(w, http.StatusOK, data)
+	departures := gtfsstore.GetDepartures(stopCode, time.Now(), h.static, h.rt)
+	respondJSON(w, departures)
 }

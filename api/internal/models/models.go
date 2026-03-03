@@ -31,6 +31,16 @@ type VehiclePosition struct {
 	Timestamp  int64   `json:"timestamp"`
 }
 
+type Departure struct {
+	Line          string `json:"line"`
+	Destination   string `json:"destination"`
+	ScheduledTime string `json:"scheduledTime"` // "HH:MM" local time
+	Status        string `json:"status"`        // "On Time", "Delayed +Xm", "Cancelled"
+	Platform      string `json:"platform,omitempty"`
+	RouteColor    string `json:"routeColor,omitempty"`
+	DelayMinutes  int    `json:"delayMinutes,omitempty"`
+}
+
 type Alert struct {
 	ID          string   `json:"id"`
 	Effect      string   `json:"effect"`

@@ -45,16 +45,33 @@ type RawAlert struct {
 	EndTime     int64
 }
 
-// RealtimeCache is a thread-safe store for enriched positions and alerts.
+// RawStopTimeUpdate holds real-time delay info for one stop within a trip.
+type RawStopTimeUpdate struct {
+	StopID               string
+	ArrivalDelay         time.Duration
+	DepartureDelay       time.Duration
+	ScheduleRelationship string // "SCHEDULED", "SKIPPED", "NO_DATA"
+}
+
+// RawTripUpdate holds real-time updates for a trip.
+type RawTripUpdate struct {
+	TripID               string
+	RouteID              string
+	ScheduleRelationship string // "SCHEDULED", "CANCELED", "ADDED"
+	StopTimeUpdates      []RawStopTimeUpdate
+}
+
+// RealtimeCache is a thread-safe store for enriched positions, alerts, and trip updates.
 type RealtimeCache struct {
-	mu        sync.RWMutex
-	positions []models.VehiclePosition
-	alerts    []models.Alert
+	mu          sync.RWMutex
+	positions   []models.VehiclePosition
+	alerts      []models.Alert
+	tripUpdates map[string]RawTripUpdate // tripID → update
 }
 
 // NewRealtimeCache creates an empty RealtimeCache.
 func NewRealtimeCache() *RealtimeCache {
-	return &RealtimeCache{}
+	return &RealtimeCache{tripUpdates: make(map[string]RawTripUpdate)}
 }
 
 // SetPositions replaces all cached positions.
@@ -300,6 +317,108 @@ func StartAlertPoller(ctx context.Context, fetcher Fetcher, lookup RouteLookup, 
 			}
 		}
 	}()
+}
+
+// SetTripUpdates replaces all cached trip updates.
+func (rc *RealtimeCache) SetTripUpdates(updates map[string]RawTripUpdate) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.tripUpdates = updates
+}
+
+// GetTripUpdate returns the real-time update for a trip, if any.
+func (rc *RealtimeCache) GetTripUpdate(tripID string) (RawTripUpdate, bool) {
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
+	u, ok := rc.tripUpdates[tripID]
+	return u, ok
+}
+
+// ParseTripUpdates parses a GTFS-RT protobuf into a map of trip updates keyed by trip ID.
+func ParseTripUpdates(data []byte) (map[string]RawTripUpdate, error) {
+	rt, err := gtfs.ParseRealtime(data, &gtfs.ParseRealtimeOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	updates := make(map[string]RawTripUpdate, len(rt.Trips))
+	for i := range rt.Trips {
+		t := &rt.Trips[i]
+		tripID := t.ID.ID
+		if tripID == "" {
+			continue
+		}
+
+		raw := RawTripUpdate{
+			TripID:               tripID,
+			RouteID:              t.ID.RouteID,
+			ScheduleRelationship: t.ID.ScheduleRelationship.String(),
+		}
+
+		for j := range t.StopTimeUpdates {
+			stu := &t.StopTimeUpdates[j]
+			var stopID string
+			if stu.StopID != nil {
+				stopID = *stu.StopID
+			}
+
+			var arrDelay, depDelay time.Duration
+			arr := stu.GetArrival()
+			if arr.Delay != nil {
+				arrDelay = *arr.Delay
+			}
+			dep := stu.GetDeparture()
+			if dep.Delay != nil {
+				depDelay = *dep.Delay
+			}
+
+			raw.StopTimeUpdates = append(raw.StopTimeUpdates, RawStopTimeUpdate{
+				StopID:               stopID,
+				ArrivalDelay:         arrDelay,
+				DepartureDelay:       depDelay,
+				ScheduleRelationship: stu.ScheduleRelationship.String(),
+			})
+		}
+
+		updates[tripID] = raw
+	}
+	return updates, nil
+}
+
+// StartTripUpdatePoller launches a background goroutine that periodically
+// fetches GTFS-RT trip updates and stores them in cache.
+func StartTripUpdatePoller(ctx context.Context, fetcher Fetcher, cache *RealtimeCache, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		fetchAndCacheTripUpdates(ctx, fetcher, cache)
+
+		for {
+			select {
+			case <-ctx.Done():
+				slog.Info("trip update poller stopped")
+				return
+			case <-ticker.C:
+				fetchAndCacheTripUpdates(ctx, fetcher, cache)
+			}
+		}
+	}()
+}
+
+func fetchAndCacheTripUpdates(ctx context.Context, fetcher Fetcher, cache *RealtimeCache) {
+	data, err := fetcher.Fetch(ctx, "/Gtfs/Feed/TripUpdates")
+	if err != nil {
+		slog.Error("fetching trip updates", "error", err)
+		return
+	}
+	updates, err := ParseTripUpdates(data)
+	if err != nil {
+		slog.Error("parsing trip updates", "error", err)
+		return
+	}
+	cache.SetTripUpdates(updates)
+	slog.Info("trip updates refreshed", "count", len(updates))
 }
 
 func fetchAndCacheAlerts(ctx context.Context, fetcher Fetcher, lookup RouteLookup, cache *RealtimeCache) {

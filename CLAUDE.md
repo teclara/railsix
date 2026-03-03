@@ -10,7 +10,7 @@ Six Rail — GO Transit real-time tracking. Fullscreen Mapbox map with station m
 
 Monorepo with two independently deployed services:
 
-- **`api/`** — Go caching proxy. Single gateway to Metrolinx OpenData API. Downloads GTFS static data at startup (refreshes every 24h), polls GTFS-RT positions (10s) and alerts (30s) in background goroutines, and caches departures with TTL + stale fallback.
+- **`api/`** — Go API server. Single gateway to Metrolinx OpenData API. Downloads GTFS static data at startup (refreshes every 24h), polls GTFS-RT positions (10s), alerts (30s), and trip updates (30s) in background goroutines. Departures are computed from the GTFS static schedule merged with real-time trip updates.
 - **`web/`** — SvelteKit frontend. Server-side `+page.server.ts` loads initial data from Go API. Client-side polling via SvelteKit API proxy routes (`/api/*` → Go API). Mapbox GL JS renders the map with GeoJSON layers.
 
 Data flow: Browser → SvelteKit SSR/proxy routes → Go API → Metrolinx OpenData API
@@ -22,7 +22,7 @@ Data flow: Browser → SvelteKit SSR/proxy routes → Go API → Metrolinx OpenD
 cd api
 go run ./cmd/server/              # start dev server (port 8080)
 go test ./... -v                  # run all tests
-go test ./internal/cache/ -v      # run single package tests
+go test ./internal/gtfs/ -v       # run gtfs package tests
 go vet ./...                      # static analysis
 ```
 
@@ -38,15 +38,15 @@ npm run build                     # production build
 
 ## Go API Structure
 
-Entry point: `api/cmd/server/main.go` — sets up GTFS stores, pollers, cache, routes, CORS middleware.
+Entry point: `api/cmd/server/main.go` — sets up GTFS stores, pollers, routes, CORS middleware.
 
 Internal packages under `api/internal/`:
 - `config/` — env var loading (`METROLINX_API_KEY`, `GTFS_STATIC_URL`, `PORT`, `ALLOWED_ORIGINS`)
-- `models/` — shared data structs (`Stop`, `Route`, `VehiclePosition`, `Alert`)
+- `models/` — shared data structs (`Stop`, `Route`, `VehiclePosition`, `Alert`, `Departure`)
 - `metrolinx/` — HTTP client for Metrolinx API (10s timeout, 10MB body limit)
-- `gtfs/static.go` — GTFS ZIP parser + thread-safe store with 24h refresh
-- `gtfs/realtime.go` — GTFS-RT protobuf parser, `RealtimeCache`, background pollers, route enrichment
-- `cache/` — generic TTL cache with `sync.RWMutex`, 5min eviction loop, stale data fallback
+- `gtfs/static.go` — GTFS ZIP parser + thread-safe store. Indexes trips, stop_times, and calendar for O(1) departure lookups. Refreshes every 24h.
+- `gtfs/realtime.go` — GTFS-RT protobuf parser, `RealtimeCache` (positions, alerts, trip updates), background pollers, route enrichment
+- `gtfs/departures.go` — departure query logic: merges GTFS static schedule with real-time trip updates, handles service calendar, timezone, and past-midnight trips
 - `handlers/` — HTTP handlers with dependency injection. Stop code validated via `^[A-Za-z0-9]{2,10}$`
 
 API routes: `GET /api/health`, `/api/stops`, `/api/departures/{stopCode}`, `/api/positions`, `/api/alerts`

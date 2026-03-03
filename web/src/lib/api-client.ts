@@ -19,7 +19,17 @@ export async function fetchAlerts(): Promise<Alert[]> {
 	return res.json();
 }
 
-export async function fetchDepartures(stopCode: string): Promise<any[]> {
+export type Departure = {
+	line: string;
+	destination: string;
+	scheduledTime: string;
+	status: string;
+	platform?: string;
+	routeColor?: string;
+	delayMinutes?: number;
+};
+
+export async function fetchDepartures(stopCode: string): Promise<Departure[]> {
 	const res = await fetch(`/api/departures/${encodeURIComponent(stopCode)}`);
 	if (!res.ok) return [];
 	return res.json();

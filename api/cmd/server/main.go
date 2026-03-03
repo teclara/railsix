@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teclara/sixrail/api/internal/cache"
 	"github.com/teclara/sixrail/api/internal/config"
 	gtfsstore "github.com/teclara/sixrail/api/internal/gtfs"
 	"github.com/teclara/sixrail/api/internal/handlers"
@@ -36,7 +35,7 @@ func main() {
 	// Start daily GTFS refresh
 	go refreshLoop(cfg.GTFSStaticURL, static, 24*time.Hour)
 
-	// Metrolinx client for REST departures + GTFS-RT feeds
+	// Metrolinx client for GTFS-RT feeds
 	client := metrolinx.NewClient(cfg.MetrolinxBaseURL, cfg.MetrolinxAPIKey)
 
 	// Realtime cache + background pollers
@@ -44,10 +43,9 @@ func main() {
 	ctx := context.Background()
 	gtfsstore.StartPositionPoller(ctx, client, static, rtCache, 10*time.Second)
 	gtfsstore.StartAlertPoller(ctx, client, static, rtCache, 30*time.Second)
+	gtfsstore.StartTripUpdatePoller(ctx, client, rtCache, 30*time.Second)
 
-	// Departures still use the TTL cache for proxying
-	c := cache.New()
-	h := handlers.New(client, c, static, rtCache)
+	h := handlers.New(static, rtCache)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", h.Health)
