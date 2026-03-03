@@ -2,13 +2,16 @@
 import { env } from '$env/dynamic/private';
 import { dev } from '$app/environment';
 
-const baseUrl = env.API_BASE_URL || (dev ? 'http://localhost:8080' : '');
-if (!baseUrl) {
-	throw new Error('API_BASE_URL environment variable is required in production');
+function getBaseUrl() {
+	const url = env.API_BASE_URL || (dev ? 'http://localhost:8080' : '');
+	if (!url) {
+		throw new Error('API_BASE_URL environment variable is required in production');
+	}
+	return url;
 }
 
 async function fetchApi<T>(path: string): Promise<T> {
-	const res = await fetch(`${baseUrl}${path}`);
+	const res = await fetch(`${getBaseUrl()}${path}`);
 	if (!res.ok) {
 		throw new Error(`API error: ${res.status} ${res.statusText}`);
 	}
