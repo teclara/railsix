@@ -9,7 +9,7 @@
 	let filtered = $derived(
 		query.length > 0
 			? stops.filter((s: any) =>
-					(s.StopName || s.Name || '').toLowerCase().includes(query.toLowerCase())
+					(s.name || '').toLowerCase().includes(query.toLowerCase())
 				)
 			: stops
 	);
@@ -32,10 +32,10 @@
 			{#each filtered.slice(0, 10) as stop}
 				<li>
 					<button
-						onclick={() => selectStation(stop.StopCode || stop.Code)}
+						onclick={() => selectStation(stop.code)}
 						class="w-full text-left px-4 py-2 hover:bg-green-50 cursor-pointer"
 					>
-						{stop.StopName || stop.Name}
+						{stop.name}
 					</button>
 				</li>
 			{/each}

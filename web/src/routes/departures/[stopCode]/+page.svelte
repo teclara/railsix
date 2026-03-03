@@ -17,7 +17,7 @@
 <div class="space-y-4">
 	<div class="flex items-center justify-between">
 		<h1 class="text-2xl font-bold">
-			{data.stopDetails?.StopName || data.stopDetails?.Name || `Station ${data.stopCode}`}
+			Station {data.stopCode}
 		</h1>
 		<button
 			onclick={() => favorites.toggle(data.stopCode)}

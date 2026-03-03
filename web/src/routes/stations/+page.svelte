@@ -8,13 +8,13 @@
 	let filtered = $derived(
 		query.length > 0
 			? data.stops.filter((s: any) =>
-					(s.StopName || s.Name || '').toLowerCase().includes(query.toLowerCase())
+					(s.name || '').toLowerCase().includes(query.toLowerCase())
 				)
 			: data.stops
 	);
 
 	let favoriteStops = $derived(
-		data.stops.filter((s: any) => $favorites.includes(s.StopCode || s.Code))
+		data.stops.filter((s: any) => $favorites.includes(s.code))
 	);
 </script>
 
@@ -29,9 +29,9 @@
 			<h2 class="text-lg font-medium mb-2">Favorites</h2>
 			<div class="grid gap-2">
 				{#each favoriteStops as stop}
-					<a href="/departures/{(stop as any).StopCode || (stop as any).Code}"
+					<a href="/departures/{stop.code}"
 						class="block bg-green-50 border border-green-200 rounded-lg p-3 hover:bg-green-100">
-						{(stop as any).StopName || (stop as any).Name}
+						{stop.name}
 					</a>
 				{/each}
 			</div>
@@ -42,9 +42,9 @@
 		<h2 class="text-lg font-medium mb-2">All Stations</h2>
 		<div class="grid gap-2">
 			{#each filtered as stop}
-				<a href="/departures/{(stop as any).StopCode || (stop as any).Code}"
+				<a href="/departures/{stop.code}"
 					class="block bg-white border border-gray-200 rounded-lg p-3 hover:bg-gray-50">
-					{(stop as any).StopName || (stop as any).Name}
+					{stop.name}
 				</a>
 			{:else}
 				<p class="text-gray-500">No stations found.</p>
