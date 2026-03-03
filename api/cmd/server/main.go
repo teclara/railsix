@@ -1,14 +1,18 @@
-// api/cmd/server/main.go
 package main
 
 import (
+	"context"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/teclara/gopulse/api/internal/cache"
 	"github.com/teclara/gopulse/api/internal/config"
+	gtfsstore "github.com/teclara/gopulse/api/internal/gtfs"
 	"github.com/teclara/gopulse/api/internal/handlers"
 	"github.com/teclara/gopulse/api/internal/metrolinx"
 )
@@ -16,31 +20,78 @@ import (
 func main() {
 	cfg := config.Load()
 
+	// Download and parse GTFS static data
+	slog.Info("downloading GTFS static data", "url", cfg.GTFSStaticURL)
+	zipData, err := downloadURL(cfg.GTFSStaticURL)
+	if err != nil {
+		slog.Error("failed to download GTFS static data", "error", err)
+		os.Exit(1)
+	}
+	static, err := gtfsstore.NewStaticStore(zipData)
+	if err != nil {
+		slog.Error("failed to parse GTFS static data", "error", err)
+		os.Exit(1)
+	}
+
+	// Start daily GTFS refresh
+	go refreshLoop(cfg.GTFSStaticURL, static, 24*time.Hour)
+
+	// Metrolinx client for REST departures + GTFS-RT feeds
 	client := metrolinx.NewClient(cfg.MetrolinxBaseURL, cfg.MetrolinxAPIKey)
+
+	// Realtime cache + background pollers
+	rtCache := gtfsstore.NewRealtimeCache()
+	ctx := context.Background()
+	gtfsstore.StartPositionPoller(ctx, client, static, rtCache, 10*time.Second)
+	gtfsstore.StartAlertPoller(ctx, client, static, rtCache, 30*time.Second)
+
+	// Departures still use the TTL cache for proxying
 	c := cache.New()
-	h := handlers.New(client, c)
+	h := handlers.New(client, c, static, rtCache)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", h.Health)
-	mux.HandleFunc("GET /api/departures/union", h.UnionDepartures)
-	mux.HandleFunc("GET /api/departures/{stopCode}", h.StopDepartures)
-	mux.HandleFunc("GET /api/trains", h.Trains)
-	mux.HandleFunc("GET /api/trains/positions", h.TrainPositions)
-	mux.HandleFunc("GET /api/alerts/service", h.ServiceAlerts)
-	mux.HandleFunc("GET /api/alerts/info", h.InfoAlerts)
-	mux.HandleFunc("GET /api/exceptions", h.Exceptions)
-	mux.HandleFunc("GET /api/schedule/lines/{date}", h.ScheduleLines)
-	mux.HandleFunc("GET /api/schedule/journey", h.ScheduleJourney)
-	mux.HandleFunc("GET /api/fares/{from}/{to}", h.Fares)
 	mux.HandleFunc("GET /api/stops", h.AllStops)
-	mux.HandleFunc("GET /api/stops/{code}", h.StopDetails)
+	mux.HandleFunc("GET /api/departures/{stopCode}", h.StopDepartures)
+	mux.HandleFunc("GET /api/positions", h.Positions)
+	mux.HandleFunc("GET /api/alerts", h.Alerts)
 
 	handler := corsMiddleware(cfg.AllowedOrigins, mux)
 
-	slog.Info("starting gopulse-api", "port", cfg.Port)
+	slog.Info("starting sixrail-api", "port", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {
 		slog.Error("server failed", "error", err)
 		os.Exit(1)
+	}
+}
+
+func downloadURL(url string) ([]byte, error) {
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("downloading %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, url)
+	}
+	const maxBytes = 50 * 1024 * 1024 // 50 MB
+	return io.ReadAll(io.LimitReader(resp.Body, maxBytes))
+}
+
+func refreshLoop(url string, static *gtfsstore.StaticStore, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for range ticker.C {
+		slog.Info("refreshing GTFS static data")
+		data, err := downloadURL(url)
+		if err != nil {
+			slog.Error("failed to download GTFS refresh", "error", err)
+			continue
+		}
+		if err := static.Refresh(data); err != nil {
+			slog.Error("failed to parse GTFS refresh", "error", err)
+		}
 	}
 }
 
