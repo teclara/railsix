@@ -190,11 +190,13 @@
 </script>
 
 <svelte:head>
-	<link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet" />
+	<link href="https://api.mapbox.com/mapbox-gl-js/v3.19.0/mapbox-gl.css" rel="stylesheet" />
 </svelte:head>
 
 <div class="relative w-screen h-screen overflow-hidden">
-	<div bind:this={mapContainer} class="absolute inset-0"></div>
+	<div class="absolute inset-0">
+		<div bind:this={mapContainer} class="w-full h-full"></div>
+	</div>
 
 	<SearchOverlay {stops} onstationselect={selectStation} />
 	<AlertsDropdown {alerts} />
