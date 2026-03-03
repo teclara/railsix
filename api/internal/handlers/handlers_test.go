@@ -3,27 +3,15 @@ package handlers_test
 import (
 	"archive/zip"
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
-	"github.com/teclara/sixrail/api/internal/cache"
 	gtfsstore "github.com/teclara/sixrail/api/internal/gtfs"
 	"github.com/teclara/sixrail/api/internal/handlers"
 	"github.com/teclara/sixrail/api/internal/models"
 )
-
-type mockFetcher struct {
-	response []byte
-	err      error
-}
-
-func (m *mockFetcher) Fetch(ctx context.Context, path string) ([]byte, error) {
-	return m.response, m.err
-}
 
 func buildTestZip(t *testing.T) []byte {
 	t.Helper()
@@ -55,7 +43,7 @@ func mustBuildStore(t *testing.T) *gtfsstore.StaticStore {
 }
 
 func TestHealthHandler(t *testing.T) {
-	h := handlers.New(nil, nil, nil, nil)
+	h := handlers.New(nil, nil)
 	req := httptest.NewRequest("GET", "/api/health", nil)
 	w := httptest.NewRecorder()
 
@@ -73,7 +61,7 @@ func TestHealthHandler(t *testing.T) {
 
 func TestAllStops(t *testing.T) {
 	store := mustBuildStore(t)
-	h := handlers.New(nil, nil, store, nil)
+	h := handlers.New(store, nil)
 
 	req := httptest.NewRequest("GET", "/api/stops", nil)
 	w := httptest.NewRecorder()
@@ -108,7 +96,7 @@ func TestPositions(t *testing.T) {
 		{VehicleID: "V1", TripID: "T1", RouteID: "01", Lat: 43.6, Lon: -79.3, Timestamp: 1000},
 	})
 
-	h := handlers.New(nil, nil, nil, rt)
+	h := handlers.New(nil, rt)
 	req := httptest.NewRequest("GET", "/api/positions", nil)
 	w := httptest.NewRecorder()
 	h.Positions(w, req)
@@ -128,7 +116,7 @@ func TestPositions(t *testing.T) {
 
 func TestPositions_Empty(t *testing.T) {
 	rt := gtfsstore.NewRealtimeCache()
-	h := handlers.New(nil, nil, nil, rt)
+	h := handlers.New(nil, rt)
 
 	req := httptest.NewRequest("GET", "/api/positions", nil)
 	w := httptest.NewRecorder()
@@ -148,7 +136,7 @@ func TestAlerts(t *testing.T) {
 		{ID: "A1", Headline: "Delay on LW", Effect: "DELAY"},
 	})
 
-	h := handlers.New(nil, nil, nil, rt)
+	h := handlers.New(nil, rt)
 	req := httptest.NewRequest("GET", "/api/alerts", nil)
 	w := httptest.NewRecorder()
 	h.Alerts(w, req)
@@ -168,7 +156,7 @@ func TestAlerts(t *testing.T) {
 
 func TestAlerts_Empty(t *testing.T) {
 	rt := gtfsstore.NewRealtimeCache()
-	h := handlers.New(nil, nil, nil, rt)
+	h := handlers.New(nil, rt)
 
 	req := httptest.NewRequest("GET", "/api/alerts", nil)
 	w := httptest.NewRecorder()
@@ -182,12 +170,10 @@ func TestAlerts_Empty(t *testing.T) {
 	}
 }
 
-func TestStopDepartures_CacheHit(t *testing.T) {
-	c := cache.New()
-	c.Set("/Stop/NextService/UN", []byte(`{"departures":[]}`), 30*time.Second)
-
-	fetcher := &mockFetcher{response: []byte(`should not be called`)}
-	h := handlers.New(fetcher, c, nil, nil)
+func TestStopDepartures_ReturnsJSON(t *testing.T) {
+	store := mustBuildStore(t)
+	rt := gtfsstore.NewRealtimeCache()
+	h := handlers.New(store, rt)
 
 	req := httptest.NewRequest("GET", "/api/departures/UN", nil)
 	req.SetPathValue("stopCode", "UN")
@@ -197,46 +183,15 @@ func TestStopDepartures_CacheHit(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	if w.Header().Get("X-Cache") != "HIT" {
-		t.Fatalf("expected X-Cache HIT, got %s", w.Header().Get("X-Cache"))
-	}
-	if w.Body.String() != `{"departures":[]}` {
-		t.Fatalf("expected cached data, got %s", w.Body.String())
-	}
-}
-
-func TestStopDepartures_CacheMiss(t *testing.T) {
-	c := cache.New()
-	fetcher := &mockFetcher{response: []byte(`{"departures":[{"trip":"123"}]}`)}
-	h := handlers.New(fetcher, c, nil, nil)
-
-	req := httptest.NewRequest("GET", "/api/departures/UN", nil)
-	req.SetPathValue("stopCode", "UN")
-	w := httptest.NewRecorder()
-	h.StopDepartures(w, req)
-
-	if w.Code != 200 {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	if w.Header().Get("X-Cache") != "MISS" {
-		t.Fatalf("expected X-Cache MISS, got %s", w.Header().Get("X-Cache"))
-	}
-	if w.Body.String() != `{"departures":[{"trip":"123"}]}` {
-		t.Fatalf("unexpected body: %s", w.Body.String())
-	}
-
-	// verify it was cached
-	val, ok := c.Get("/Stop/NextService/UN")
-	if !ok {
-		t.Fatal("expected value to be cached")
-	}
-	if string(val) != `{"departures":[{"trip":"123"}]}` {
-		t.Fatalf("unexpected cached value: %s", string(val))
+	// Response must be a JSON array (may be empty depending on current time vs schedule).
+	var departures []models.Departure
+	if err := json.Unmarshal(w.Body.Bytes(), &departures); err != nil {
+		t.Fatalf("expected JSON array, got: %s, err: %v", w.Body.String(), err)
 	}
 }
 
 func TestStopDepartures_InvalidCode(t *testing.T) {
-	h := handlers.New(nil, nil, nil, nil)
+	h := handlers.New(nil, nil)
 
 	cases := []string{"../etc", "", "A", "TOOLONGSTOPCODE123"}
 	for _, code := range cases {
