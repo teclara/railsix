@@ -20,6 +20,23 @@ type ScheduledDeparture struct {
 	DepartureTime time.Duration // duration from midnight (local time)
 }
 
+// TripStop is one stop in a trip's ordered sequence, used for position simulation.
+type TripStop struct {
+	StopID        string
+	Lat           float64
+	Lon           float64
+	ArrivalTime   time.Duration // duration from midnight of service day
+	DepartureTime time.Duration
+}
+
+// SimTrip holds a trip's identity and full stop sequence for position simulation.
+type SimTrip struct {
+	TripID    string
+	RouteID   string
+	ServiceID string
+	Stops     []TripStop
+}
+
 type StaticStore struct {
 	mu        sync.RWMutex
 	stops     []models.Stop
@@ -27,6 +44,7 @@ type StaticStore struct {
 	stopIndex map[string][]ScheduledDeparture // stopID → sorted departures
 	stopCodes map[string][]string             // stopCode → []stopID (parent + children)
 	services  map[string]*gtfs.Service        // serviceID → service
+	tripIndex map[string]SimTrip              // tripID → SimTrip
 }
 
 func NewStaticStore(zipData []byte) (*StaticStore, error) {
@@ -129,12 +147,45 @@ func (s *StaticStore) load(zipData []byte) error {
 		}
 	}
 
+	// --- Trip index for position simulation ---
+	tripIndex := make(map[string]SimTrip, len(static.Trips))
+	for i := range static.Trips {
+		trip := &static.Trips[i]
+		if trip.Route == nil || trip.Service == nil {
+			continue
+		}
+		stops := make([]TripStop, 0, len(trip.StopTimes))
+		for j := range trip.StopTimes {
+			st := &trip.StopTimes[j]
+			if st.Stop == nil || st.Stop.Latitude == nil || st.Stop.Longitude == nil {
+				continue
+			}
+			stops = append(stops, TripStop{
+				StopID:        st.Stop.Id,
+				Lat:           *st.Stop.Latitude,
+				Lon:           *st.Stop.Longitude,
+				ArrivalTime:   st.ArrivalTime,
+				DepartureTime: st.DepartureTime,
+			})
+		}
+		if len(stops) < 2 {
+			continue // need at least 2 stops to interpolate
+		}
+		tripIndex[trip.ID] = SimTrip{
+			TripID:    trip.ID,
+			RouteID:   trip.Route.Id,
+			ServiceID: trip.Service.Id,
+			Stops:     stops,
+		}
+	}
+
 	s.mu.Lock()
 	s.stops = stops
 	s.routes = routes
 	s.stopIndex = stopIndex
 	s.stopCodes = stopCodes
 	s.services = services
+	s.tripIndex = tripIndex
 	s.mu.Unlock()
 
 	slog.Info("GTFS static loaded",
@@ -203,6 +254,29 @@ func (s *StaticStore) IsServiceActive(serviceID string, date time.Time) bool {
 		return false
 	}
 	return serviceActive(svc, date)
+}
+
+// ActiveSimTrips returns all trips whose service is active on the given date.
+// Used by the position simulator to find trips currently running.
+func (s *StaticStore) ActiveSimTrips(now time.Time) []SimTrip {
+	loc, _ := time.LoadLocation("America/Toronto")
+	nowLocal := now.In(loc)
+	today := truncateToDay(nowLocal)
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make([]SimTrip, 0, 256)
+	for _, trip := range s.tripIndex {
+		svc, ok := s.services[trip.ServiceID]
+		if !ok {
+			continue
+		}
+		if serviceActive(svc, today) {
+			out = append(out, trip)
+		}
+	}
+	return out
 }
 
 func serviceActive(svc *gtfs.Service, date time.Time) bool {
