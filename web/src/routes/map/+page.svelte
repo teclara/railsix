@@ -1,8 +1,8 @@
-<!-- web/src/routes/map/+page.svelte -->
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import { env } from '$env/dynamic/public';
+	import type { VehiclePosition } from '$lib/api';
 
 	let { data } = $props();
 	let mapContainer: HTMLDivElement;
@@ -16,44 +16,37 @@
 		markers.forEach((m) => m.remove());
 		markers = [];
 
-		if ((data.positions as any)?.entity) {
-			for (const entity of (data.positions as any).entity) {
-				const vp = entity.vehicle?.position;
-				if (vp?.latitude && vp?.longitude) {
-					const m = new mapboxgl.Marker({ color: '#15803d' })
-						.setLngLat([vp.longitude, vp.latitude])
-						.setPopup(
-							new mapboxgl.Popup().setHTML(
-								`<strong>Trip ${entity.vehicle?.trip?.tripId || '—'}</strong><br/>
-								 Route: ${entity.vehicle?.trip?.routeId || '—'}`
-							)
-						)
-						.addTo(map);
-					markers.push(m);
-				}
-			}
+		for (const pos of data.positions as VehiclePosition[]) {
+			if (!pos.lat || !pos.lon) continue;
+			const color = pos.routeColor ? `#${pos.routeColor}` : '#15803d';
+			const m = new mapboxgl.Marker({ color })
+				.setLngLat([pos.lon, pos.lat])
+				.setPopup(
+					new mapboxgl.Popup().setHTML(
+						`<strong>${pos.routeName || pos.routeId || '—'}</strong><br/>
+						 Trip: ${pos.tripId || '—'}`
+					)
+				)
+				.addTo(map);
+			markers.push(m);
 		}
 	}
 
 	onMount(() => {
 		(async () => {
 			mapboxgl = (await import('mapbox-gl')).default;
-
 			mapboxgl.accessToken = env.PUBLIC_MAPBOX_TOKEN || '';
-
 			map = new mapboxgl.Map({
 				container: mapContainer,
 				style: 'mapbox://styles/mapbox/light-v11',
 				center: [-79.38, 43.65],
 				zoom: 9
 			});
-
 			map.addControl(new mapboxgl.NavigationControl());
 			updateMarkers();
 		})();
 
 		const interval = setInterval(() => invalidateAll(), 15_000);
-
 		return () => {
 			clearInterval(interval);
 			markers.forEach((m) => m.remove());
