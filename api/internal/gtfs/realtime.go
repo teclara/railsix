@@ -265,7 +265,7 @@ func StartPositionPoller(ctx context.Context, fetcher Fetcher, lookup RouteLooku
 }
 
 func fetchAndCachePositions(ctx context.Context, fetcher Fetcher, lookup RouteLookup, cache *RealtimeCache) {
-	data, err := fetcher.Fetch(ctx, "/GTFS_RT/Vehicle/VehiclePositions.pb")
+	data, err := fetcher.Fetch(ctx, "/Gtfs/Feed/VehiclePosition")
 	if err != nil {
 		slog.Error("fetching vehicle positions", "error", err)
 		return
@@ -303,7 +303,7 @@ func StartAlertPoller(ctx context.Context, fetcher Fetcher, lookup RouteLookup, 
 }
 
 func fetchAndCacheAlerts(ctx context.Context, fetcher Fetcher, lookup RouteLookup, cache *RealtimeCache) {
-	data, err := fetcher.Fetch(ctx, "/GTFS_RT/Alerts/AllAlerts.pb")
+	data, err := fetcher.Fetch(ctx, "/Gtfs/Feed/Alerts")
 	if err != nil {
 		slog.Error("fetching alerts", "error", err)
 		return
