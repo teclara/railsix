@@ -1,3 +1,7 @@
+# Go binaries
+api/server
+api/*.exe
+
 # Logs
 logs
 *.log
