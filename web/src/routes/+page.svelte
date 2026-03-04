@@ -8,6 +8,8 @@
 	import SearchOverlay from '$lib/components/SearchOverlay.svelte';
 	import AlertsDropdown from '$lib/components/AlertsDropdown.svelte';
 	import DeparturesPanel from '$lib/components/DeparturesPanel.svelte';
+	import FilterChips from '$lib/components/FilterChips.svelte';
+	import { filters, type FilterState } from '$lib/stores/filters';
 
 	let { data } = $props();
 
@@ -15,10 +17,22 @@
 	let positions = $state<VehiclePosition[]>([]);
 	let alerts = $state<Alert[]>([]);
 
+	let filterState = $state<FilterState>({
+		showTrains: true,
+		showBuses: true,
+		activeRoutes: [],
+		activeStatuses: []
+	});
+
 	// Seed client state from server data on first render
 	$effect(() => {
 		if (positions.length === 0 && data.positions.length > 0) positions = data.positions;
 		if (alerts.length === 0 && data.alerts.length > 0) alerts = data.alerts;
+	});
+
+	$effect(() => {
+		const unsub = filters.subscribe((s) => (filterState = s));
+		return unsub;
 	});
 
 	let mapContainer: HTMLDivElement;
@@ -44,19 +58,33 @@
 		if (!map || !mapReady) return;
 		const source = map.getSource('positions');
 		if (!source) return;
+
+		const filtered = positions.filter((p) => {
+			if (!p.lat || !p.lon) return false;
+			const isRail = p.routeType === 2 || p.routeType === 0;
+			const isBus = p.routeType === 3;
+			if (isRail && !filterState.showTrains) return false;
+			if (isBus && !filterState.showBuses) return false;
+			if (filterState.activeRoutes.length > 0 && !filterState.activeRoutes.includes(p.routeName))
+				return false;
+			if (filterState.activeStatuses.length > 0) {
+				const status = 'ontime';
+				if (!filterState.activeStatuses.includes(status)) return false;
+			}
+			return true;
+		});
+
 		source.setData({
 			type: 'FeatureCollection',
-			features: positions
-				.filter((p) => p.lat && p.lon)
-				.map((p) => ({
-					type: 'Feature',
-					geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
-					properties: {
-						routeName: p.routeName || p.routeId || '',
-						tripId: p.tripId || '',
-						color: p.routeColor ? `#${p.routeColor}` : '#15803d'
-					}
-				}))
+			features: filtered.map((p) => ({
+				type: 'Feature',
+				geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+				properties: {
+					routeName: p.routeName || p.routeId || '',
+					tripId: p.tripId || '',
+					color: p.routeColor ? `#${p.routeColor}` : '#15803d'
+				}
+			}))
 		});
 	}
 
@@ -192,6 +220,7 @@
 	// Update position markers when positions change
 	$effect(() => {
 		positions;
+		filterState;
 		updatePositionLayer();
 	});
 </script>
@@ -207,6 +236,7 @@
 
 	<SearchOverlay {stops} onstationselect={selectStation} />
 	<AlertsDropdown {alerts} />
+	<FilterChips {positions} {filterState} />
 
 	{#if mapError}
 		<div class="absolute inset-0 z-30 flex items-center justify-center bg-white/80">
