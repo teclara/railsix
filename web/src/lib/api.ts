@@ -32,6 +32,7 @@ export interface VehiclePosition {
 	routeId: string;
 	routeName: string;
 	routeColor: string;
+	routeType: number;
 	lat: number;
 	lon: number;
 	bearing?: number;
