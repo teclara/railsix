@@ -38,6 +38,7 @@ func SimulatePositions(now time.Time, static *StaticStore) []models.VehiclePosit
 			RouteID:    trip.RouteID,
 			RouteName:  route.LongName,
 			RouteColor: route.Color,
+			RouteType:  route.Type,
 			Lat:        pos.lat,
 			Lon:        pos.lon,
 			Bearing:    pos.bearing,

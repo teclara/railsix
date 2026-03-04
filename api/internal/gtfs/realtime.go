@@ -227,6 +227,7 @@ func EnrichPositions(raw []RawPosition, lookup RouteLookup) []models.VehiclePosi
 		if route, ok := lookup.GetRoute(rp.RouteID); ok {
 			vp.RouteName = route.LongName
 			vp.RouteColor = route.Color
+			vp.RouteType = route.Type
 		}
 		out[i] = vp
 	}
