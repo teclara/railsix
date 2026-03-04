@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/teclara/sixrail/api/internal/config"
 	gtfsstore "github.com/teclara/sixrail/api/internal/gtfs"
