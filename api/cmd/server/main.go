@@ -36,15 +36,18 @@ func main() {
 	// Start daily GTFS refresh
 	go refreshLoop(cfg.GTFSStaticURL, static, 24*time.Hour)
 
-	// Metrolinx client for GTFS-RT feeds
-	client := metrolinx.NewClient(cfg.MetrolinxBaseURL, cfg.MetrolinxAPIKey)
-
 	// Realtime cache + background pollers
 	rtCache := gtfsstore.NewRealtimeCache()
 	ctx := context.Background()
-	gtfsstore.StartPositionPoller(ctx, client, static, rtCache, 10*time.Second)
-	gtfsstore.StartAlertPoller(ctx, client, static, rtCache, 30*time.Second)
-	gtfsstore.StartTripUpdatePoller(ctx, client, rtCache, 30*time.Second)
+	if cfg.MetrolinxAPIKey == "" {
+		slog.Info("METROLINX_API_KEY not set — using simulated vehicle positions")
+		gtfsstore.StartSimulatedPositionPoller(ctx, static, rtCache, 10*time.Second)
+	} else {
+		client := metrolinx.NewClient(cfg.MetrolinxBaseURL, cfg.MetrolinxAPIKey)
+		gtfsstore.StartPositionPoller(ctx, client, static, rtCache, 10*time.Second)
+		gtfsstore.StartAlertPoller(ctx, client, static, rtCache, 30*time.Second)
+		gtfsstore.StartTripUpdatePoller(ctx, client, rtCache, 30*time.Second)
+	}
 
 	h := handlers.New(static, rtCache)
 

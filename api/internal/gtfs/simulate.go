@@ -15,6 +15,7 @@ import (
 func SimulatePositions(now time.Time, static *StaticStore) []models.VehiclePosition {
 	loc, err := time.LoadLocation("America/Toronto")
 	if err != nil {
+		slog.Warn("failed to load America/Toronto timezone, falling back to UTC", "error", err)
 		loc = time.UTC
 	}
 	nowLocal := now.In(loc)
@@ -55,6 +56,9 @@ type interpResult struct {
 
 func interpolatePosition(trip SimTrip, nowOffset time.Duration) (interpResult, bool) {
 	stops := trip.Stops
+	if len(stops) < 2 {
+		return interpResult{}, false
+	}
 
 	if nowOffset < stops[0].DepartureTime {
 		return interpResult{}, false
