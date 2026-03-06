@@ -19,7 +19,7 @@
 
 	let filterState = $state<FilterState>({
 		showTrains: true,
-		showBuses: true,
+		showBuses: false,
 		activeRoutes: [],
 		activeStatuses: []
 	});

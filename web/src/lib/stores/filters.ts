@@ -10,7 +10,7 @@ export interface FilterState {
 
 const defaultFilters: FilterState = {
 	showTrains: true,
-	showBuses: true,
+	showBuses: false,
 	activeRoutes: [],
 	activeStatuses: []
 };
