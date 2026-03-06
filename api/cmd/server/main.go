@@ -44,10 +44,13 @@ func main() {
 		gtfsstore.StartSimulatedPositionPoller(ctx, static, rtCache, 10*time.Second)
 	} else {
 		client := metrolinx.NewClient(cfg.MetrolinxBaseURL, cfg.MetrolinxAPIKey)
-		// Validate API key with a test request before starting pollers
-		_, err := client.Fetch(ctx, "/Gtfs/Feed/VehiclePosition")
+		// Validate API key by fetching AND parsing a GTFS-RT feed
+		testData, err := client.Fetch(ctx, "/Gtfs/Feed/VehiclePosition")
 		if err != nil {
-			slog.Warn("Metrolinx API key validation failed, falling back to simulated positions", "error", err)
+			slog.Warn("Metrolinx API fetch failed, falling back to simulated positions", "error", err)
+			gtfsstore.StartSimulatedPositionPoller(ctx, static, rtCache, 10*time.Second)
+		} else if _, parseErr := gtfsstore.ParsePositions(testData); parseErr != nil {
+			slog.Warn("Metrolinx API returned invalid protobuf, falling back to simulated positions", "error", parseErr)
 			gtfsstore.StartSimulatedPositionPoller(ctx, static, rtCache, 10*time.Second)
 		} else {
 			slog.Info("Metrolinx API key validated, starting real-time pollers")
