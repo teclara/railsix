@@ -2,11 +2,10 @@ package gtfs
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"sync"
 	"time"
-
-	"github.com/jamespfennell/gtfs"
 
 	"github.com/teclara/sixrail/api/internal/models"
 )
@@ -21,7 +20,90 @@ type Fetcher interface {
 	Fetch(ctx context.Context, path string) ([]byte, error)
 }
 
-// RawPosition holds pre-enrichment vehicle position data parsed from GTFS-RT.
+// --- JSON structures matching Metrolinx GTFS-RT JSON format ---
+
+type gtfsRTFeed struct {
+	Entity []gtfsRTEntity `json:"entity"`
+}
+
+type gtfsRTEntity struct {
+	ID         string          `json:"id"`
+	Vehicle    *gtfsRTVehicle  `json:"vehicle"`
+	Alert      *gtfsRTAlert    `json:"alert"`
+	TripUpdate *gtfsRTTripUpd  `json:"trip_update"`
+}
+
+type gtfsRTVehicle struct {
+	Trip      gtfsRTTrip     `json:"trip"`
+	Vehicle   gtfsRTVehID    `json:"vehicle"`
+	Position  *gtfsRTPos     `json:"position"`
+	Timestamp int64          `json:"timestamp"`
+}
+
+type gtfsRTTrip struct {
+	TripID               string `json:"trip_id"`
+	RouteID              string `json:"route_id"`
+	ScheduleRelationship string `json:"schedule_relationship"`
+}
+
+type gtfsRTVehID struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+type gtfsRTPos struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	Bearing   float32 `json:"bearing"`
+	Speed     float32 `json:"speed"`
+}
+
+type gtfsRTAlert struct {
+	ActivePeriod   []gtfsRTActivePeriod  `json:"active_period"`
+	InformedEntity []gtfsRTInformedEnt   `json:"informed_entity"`
+	Effect         string                `json:"effect"`
+	URL            *gtfsRTTranslatedStr  `json:"url"`
+	HeaderText     *gtfsRTTranslatedStr  `json:"header_text"`
+	DescriptionTxt *gtfsRTTranslatedStr  `json:"description_text"`
+}
+
+type gtfsRTActivePeriod struct {
+	Start int64 `json:"start"`
+	End   int64 `json:"end"`
+}
+
+type gtfsRTInformedEnt struct {
+	RouteID string `json:"route_id"`
+}
+
+type gtfsRTTranslatedStr struct {
+	Translation []gtfsRTTranslation `json:"translation"`
+}
+
+type gtfsRTTranslation struct {
+	Text     string `json:"text"`
+	Language string `json:"language"`
+}
+
+type gtfsRTTripUpd struct {
+	Trip           gtfsRTTrip       `json:"trip"`
+	StopTimeUpdate []gtfsRTStopTime `json:"stop_time_update"`
+}
+
+type gtfsRTStopTime struct {
+	StopID               string          `json:"stop_id"`
+	Arrival              *gtfsRTDelay    `json:"arrival"`
+	Departure            *gtfsRTDelay    `json:"departure"`
+	ScheduleRelationship string          `json:"schedule_relationship"`
+}
+
+type gtfsRTDelay struct {
+	Delay int `json:"delay"`
+}
+
+// --- Raw intermediate types ---
+
+// RawPosition holds pre-enrichment vehicle position data.
 type RawPosition struct {
 	VehicleID string
 	TripID    string
@@ -33,7 +115,7 @@ type RawPosition struct {
 	Timestamp int64
 }
 
-// RawAlert holds pre-enrichment alert data parsed from GTFS-RT.
+// RawAlert holds pre-enrichment alert data.
 type RawAlert struct {
 	ID          string
 	Effect      string
@@ -50,38 +132,37 @@ type RawStopTimeUpdate struct {
 	StopID               string
 	ArrivalDelay         time.Duration
 	DepartureDelay       time.Duration
-	ScheduleRelationship string // "SCHEDULED", "SKIPPED", "NO_DATA"
+	ScheduleRelationship string
 }
 
 // RawTripUpdate holds real-time updates for a trip.
 type RawTripUpdate struct {
 	TripID               string
 	RouteID              string
-	ScheduleRelationship string // "SCHEDULED", "CANCELED", "ADDED"
+	ScheduleRelationship string
 	StopTimeUpdates      []RawStopTimeUpdate
 }
+
+// --- Cache ---
 
 // RealtimeCache is a thread-safe store for enriched positions, alerts, and trip updates.
 type RealtimeCache struct {
 	mu          sync.RWMutex
 	positions   []models.VehiclePosition
 	alerts      []models.Alert
-	tripUpdates map[string]RawTripUpdate // tripID → update
+	tripUpdates map[string]RawTripUpdate
 }
 
-// NewRealtimeCache creates an empty RealtimeCache.
 func NewRealtimeCache() *RealtimeCache {
 	return &RealtimeCache{tripUpdates: make(map[string]RawTripUpdate)}
 }
 
-// SetPositions replaces all cached positions.
 func (rc *RealtimeCache) SetPositions(positions []models.VehiclePosition) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 	rc.positions = positions
 }
 
-// GetPositions returns a copy of all cached positions.
 func (rc *RealtimeCache) GetPositions() []models.VehiclePosition {
 	rc.mu.RLock()
 	defer rc.mu.RUnlock()
@@ -90,14 +171,12 @@ func (rc *RealtimeCache) GetPositions() []models.VehiclePosition {
 	return out
 }
 
-// SetAlerts replaces all cached alerts.
 func (rc *RealtimeCache) SetAlerts(alerts []models.Alert) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 	rc.alerts = alerts
 }
 
-// GetAlerts returns a copy of all cached alerts.
 func (rc *RealtimeCache) GetAlerts() []models.Alert {
 	rc.mu.RLock()
 	defer rc.mu.RUnlock()
@@ -106,99 +185,91 @@ func (rc *RealtimeCache) GetAlerts() []models.Alert {
 	return out
 }
 
-// ParsePositions parses a GTFS-RT protobuf into raw vehicle positions.
+func (rc *RealtimeCache) SetTripUpdates(updates map[string]RawTripUpdate) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.tripUpdates = updates
+}
+
+func (rc *RealtimeCache) GetTripUpdate(tripID string) (RawTripUpdate, bool) {
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
+	u, ok := rc.tripUpdates[tripID]
+	return u, ok
+}
+
+// --- JSON parsers ---
+
+// ParsePositions parses the Metrolinx GTFS-RT JSON vehicle positions feed.
 func ParsePositions(data []byte) ([]RawPosition, error) {
-	rt, err := gtfs.ParseRealtime(data, &gtfs.ParseRealtimeOptions{})
-	if err != nil {
+	var feed gtfsRTFeed
+	if err := json.Unmarshal(data, &feed); err != nil {
 		return nil, err
 	}
 
-	positions := make([]RawPosition, 0, len(rt.Vehicles))
-	for i := range rt.Vehicles {
-		v := &rt.Vehicles[i]
-		vid := v.GetID()
-		trip := v.GetTrip()
-
-		var lat, lon float64
-		var bearing, speed float32
-		if v.Position != nil {
-			if v.Position.Latitude != nil {
-				lat = float64(*v.Position.Latitude)
-			}
-			if v.Position.Longitude != nil {
-				lon = float64(*v.Position.Longitude)
-			}
-			if v.Position.Bearing != nil {
-				bearing = *v.Position.Bearing
-			}
-			if v.Position.Speed != nil {
-				speed = *v.Position.Speed
-			}
+	positions := make([]RawPosition, 0, len(feed.Entity))
+	for _, e := range feed.Entity {
+		if e.Vehicle == nil || e.Vehicle.Position == nil {
+			continue
 		}
-
-		var ts int64
-		if v.Timestamp != nil {
-			ts = v.Timestamp.Unix()
-		}
-
+		v := e.Vehicle
 		positions = append(positions, RawPosition{
-			VehicleID: vid.ID,
-			TripID:    trip.ID.ID,
-			RouteID:   trip.ID.RouteID,
-			Lat:       lat,
-			Lon:       lon,
-			Bearing:   bearing,
-			Speed:     speed,
-			Timestamp: ts,
+			VehicleID: v.Vehicle.ID,
+			TripID:    v.Trip.TripID,
+			RouteID:   v.Trip.RouteID,
+			Lat:       v.Position.Latitude,
+			Lon:       v.Position.Longitude,
+			Bearing:   v.Position.Bearing,
+			Speed:     v.Position.Speed,
+			Timestamp: v.Timestamp,
 		})
 	}
 	return positions, nil
 }
 
-// ParseAlerts parses a GTFS-RT protobuf into raw alerts.
+// ParseAlerts parses the Metrolinx GTFS-RT JSON alerts feed.
 func ParseAlerts(data []byte) ([]RawAlert, error) {
-	rt, err := gtfs.ParseRealtime(data, &gtfs.ParseRealtimeOptions{})
-	if err != nil {
+	var feed gtfsRTFeed
+	if err := json.Unmarshal(data, &feed); err != nil {
 		return nil, err
 	}
 
-	alerts := make([]RawAlert, 0, len(rt.Alerts))
-	for i := range rt.Alerts {
-		a := &rt.Alerts[i]
+	alerts := make([]RawAlert, 0, len(feed.Entity))
+	for _, e := range feed.Entity {
+		if e.Alert == nil {
+			continue
+		}
+		a := e.Alert
 
 		var headline, description, url string
-		if len(a.Header) > 0 {
-			headline = a.Header[0].Text
+		if a.HeaderText != nil {
+			headline = englishText(a.HeaderText.Translation)
 		}
-		if len(a.Description) > 0 {
-			description = a.Description[0].Text
+		if a.DescriptionTxt != nil {
+			description = englishText(a.DescriptionTxt.Translation)
 		}
-		if len(a.URL) > 0 {
-			url = a.URL[0].Text
+		if a.URL != nil {
+			url = englishText(a.URL.Translation)
 		}
 
-		var routeIDs []string
 		seen := make(map[string]bool)
-		for _, ie := range a.InformedEntities {
-			if ie.RouteID != nil && !seen[*ie.RouteID] {
-				routeIDs = append(routeIDs, *ie.RouteID)
-				seen[*ie.RouteID] = true
+		var routeIDs []string
+		for _, ie := range a.InformedEntity {
+			if ie.RouteID != "" && !seen[ie.RouteID] {
+				routeIDs = append(routeIDs, ie.RouteID)
+				seen[ie.RouteID] = true
 			}
 		}
 
 		var startTime, endTime int64
-		if len(a.ActivePeriods) > 0 {
-			if a.ActivePeriods[0].StartsAt != nil {
-				startTime = a.ActivePeriods[0].StartsAt.Unix()
-			}
-			if a.ActivePeriods[0].EndsAt != nil {
-				endTime = a.ActivePeriods[0].EndsAt.Unix()
-			}
+		if len(a.ActivePeriod) > 0 {
+			startTime = a.ActivePeriod[0].Start
+			endTime = a.ActivePeriod[0].End
 		}
 
 		alerts = append(alerts, RawAlert{
-			ID:          a.ID,
-			Effect:      a.Effect.String(),
+			ID:          e.ID,
+			Effect:      a.Effect,
 			Headline:    headline,
 			Description: description,
 			URL:         url,
@@ -210,7 +281,65 @@ func ParseAlerts(data []byte) ([]RawAlert, error) {
 	return alerts, nil
 }
 
-// EnrichPositions adds route names and colors from a RouteLookup.
+// ParseTripUpdates parses the Metrolinx GTFS-RT JSON trip updates feed.
+func ParseTripUpdates(data []byte) (map[string]RawTripUpdate, error) {
+	var feed gtfsRTFeed
+	if err := json.Unmarshal(data, &feed); err != nil {
+		return nil, err
+	}
+
+	updates := make(map[string]RawTripUpdate, len(feed.Entity))
+	for _, e := range feed.Entity {
+		if e.TripUpdate == nil {
+			continue
+		}
+		tu := e.TripUpdate
+		tripID := tu.Trip.TripID
+		if tripID == "" {
+			continue
+		}
+
+		raw := RawTripUpdate{
+			TripID:               tripID,
+			RouteID:              tu.Trip.RouteID,
+			ScheduleRelationship: tu.Trip.ScheduleRelationship,
+		}
+
+		for _, stu := range tu.StopTimeUpdate {
+			var arrDelay, depDelay time.Duration
+			if stu.Arrival != nil {
+				arrDelay = time.Duration(stu.Arrival.Delay) * time.Second
+			}
+			if stu.Departure != nil {
+				depDelay = time.Duration(stu.Departure.Delay) * time.Second
+			}
+			raw.StopTimeUpdates = append(raw.StopTimeUpdates, RawStopTimeUpdate{
+				StopID:               stu.StopID,
+				ArrivalDelay:         arrDelay,
+				DepartureDelay:       depDelay,
+				ScheduleRelationship: stu.ScheduleRelationship,
+			})
+		}
+
+		updates[tripID] = raw
+	}
+	return updates, nil
+}
+
+func englishText(translations []gtfsRTTranslation) string {
+	for _, t := range translations {
+		if t.Language == "en" {
+			return t.Text
+		}
+	}
+	if len(translations) > 0 {
+		return translations[0].Text
+	}
+	return ""
+}
+
+// --- Enrichment ---
+
 func EnrichPositions(raw []RawPosition, lookup RouteLookup) []models.VehiclePosition {
 	out := make([]models.VehiclePosition, len(raw))
 	for i, rp := range raw {
@@ -234,7 +363,6 @@ func EnrichPositions(raw []RawPosition, lookup RouteLookup) []models.VehiclePosi
 	return out
 }
 
-// EnrichAlerts adds route names from a RouteLookup.
 func EnrichAlerts(raw []RawAlert, lookup RouteLookup) []models.Alert {
 	out := make([]models.Alert, len(raw))
 	for i, ra := range raw {
@@ -260,16 +388,13 @@ func EnrichAlerts(raw []RawAlert, lookup RouteLookup) []models.Alert {
 	return out
 }
 
-// StartPositionPoller launches a background goroutine that periodically
-// fetches GTFS-RT vehicle positions, enriches them, and stores them in cache.
+// --- Pollers ---
+
 func StartPositionPoller(ctx context.Context, fetcher Fetcher, lookup RouteLookup, cache *RealtimeCache, interval time.Duration) {
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
-
-		// Fetch immediately on start.
 		fetchAndCachePositions(ctx, fetcher, lookup, cache)
-
 		for {
 			select {
 			case <-ctx.Done():
@@ -277,6 +402,40 @@ func StartPositionPoller(ctx context.Context, fetcher Fetcher, lookup RouteLooku
 				return
 			case <-ticker.C:
 				fetchAndCachePositions(ctx, fetcher, lookup, cache)
+			}
+		}
+	}()
+}
+
+func StartAlertPoller(ctx context.Context, fetcher Fetcher, lookup RouteLookup, cache *RealtimeCache, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		fetchAndCacheAlerts(ctx, fetcher, lookup, cache)
+		for {
+			select {
+			case <-ctx.Done():
+				slog.Info("alert poller stopped")
+				return
+			case <-ticker.C:
+				fetchAndCacheAlerts(ctx, fetcher, lookup, cache)
+			}
+		}
+	}()
+}
+
+func StartTripUpdatePoller(ctx context.Context, fetcher Fetcher, cache *RealtimeCache, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		fetchAndCacheTripUpdates(ctx, fetcher, cache)
+		for {
+			select {
+			case <-ctx.Done():
+				slog.Info("trip update poller stopped")
+				return
+			case <-ticker.C:
+				fetchAndCacheTripUpdates(ctx, fetcher, cache)
 			}
 		}
 	}()
@@ -298,113 +457,20 @@ func fetchAndCachePositions(ctx context.Context, fetcher Fetcher, lookup RouteLo
 	slog.Info("vehicle positions updated", "count", len(enriched))
 }
 
-// StartAlertPoller launches a background goroutine that periodically
-// fetches GTFS-RT alerts, enriches them, and stores them in cache.
-func StartAlertPoller(ctx context.Context, fetcher Fetcher, lookup RouteLookup, cache *RealtimeCache, interval time.Duration) {
-	go func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-
-		// Fetch immediately on start.
-		fetchAndCacheAlerts(ctx, fetcher, lookup, cache)
-
-		for {
-			select {
-			case <-ctx.Done():
-				slog.Info("alert poller stopped")
-				return
-			case <-ticker.C:
-				fetchAndCacheAlerts(ctx, fetcher, lookup, cache)
-			}
-		}
-	}()
-}
-
-// SetTripUpdates replaces all cached trip updates.
-func (rc *RealtimeCache) SetTripUpdates(updates map[string]RawTripUpdate) {
-	rc.mu.Lock()
-	defer rc.mu.Unlock()
-	rc.tripUpdates = updates
-}
-
-// GetTripUpdate returns the real-time update for a trip, if any.
-func (rc *RealtimeCache) GetTripUpdate(tripID string) (RawTripUpdate, bool) {
-	rc.mu.RLock()
-	defer rc.mu.RUnlock()
-	u, ok := rc.tripUpdates[tripID]
-	return u, ok
-}
-
-// ParseTripUpdates parses a GTFS-RT protobuf into a map of trip updates keyed by trip ID.
-func ParseTripUpdates(data []byte) (map[string]RawTripUpdate, error) {
-	rt, err := gtfs.ParseRealtime(data, &gtfs.ParseRealtimeOptions{})
+func fetchAndCacheAlerts(ctx context.Context, fetcher Fetcher, lookup RouteLookup, cache *RealtimeCache) {
+	data, err := fetcher.Fetch(ctx, "/Gtfs/Feed/Alerts")
 	if err != nil {
-		return nil, err
+		slog.Error("fetching alerts", "error", err)
+		return
 	}
-
-	updates := make(map[string]RawTripUpdate, len(rt.Trips))
-	for i := range rt.Trips {
-		t := &rt.Trips[i]
-		tripID := t.ID.ID
-		if tripID == "" {
-			continue
-		}
-
-		raw := RawTripUpdate{
-			TripID:               tripID,
-			RouteID:              t.ID.RouteID,
-			ScheduleRelationship: t.ID.ScheduleRelationship.String(),
-		}
-
-		for j := range t.StopTimeUpdates {
-			stu := &t.StopTimeUpdates[j]
-			var stopID string
-			if stu.StopID != nil {
-				stopID = *stu.StopID
-			}
-
-			var arrDelay, depDelay time.Duration
-			arr := stu.GetArrival()
-			if arr.Delay != nil {
-				arrDelay = *arr.Delay
-			}
-			dep := stu.GetDeparture()
-			if dep.Delay != nil {
-				depDelay = *dep.Delay
-			}
-
-			raw.StopTimeUpdates = append(raw.StopTimeUpdates, RawStopTimeUpdate{
-				StopID:               stopID,
-				ArrivalDelay:         arrDelay,
-				DepartureDelay:       depDelay,
-				ScheduleRelationship: stu.ScheduleRelationship.String(),
-			})
-		}
-
-		updates[tripID] = raw
+	raw, err := ParseAlerts(data)
+	if err != nil {
+		slog.Error("parsing alerts", "error", err)
+		return
 	}
-	return updates, nil
-}
-
-// StartTripUpdatePoller launches a background goroutine that periodically
-// fetches GTFS-RT trip updates and stores them in cache.
-func StartTripUpdatePoller(ctx context.Context, fetcher Fetcher, cache *RealtimeCache, interval time.Duration) {
-	go func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-
-		fetchAndCacheTripUpdates(ctx, fetcher, cache)
-
-		for {
-			select {
-			case <-ctx.Done():
-				slog.Info("trip update poller stopped")
-				return
-			case <-ticker.C:
-				fetchAndCacheTripUpdates(ctx, fetcher, cache)
-			}
-		}
-	}()
+	enriched := EnrichAlerts(raw, lookup)
+	cache.SetAlerts(enriched)
+	slog.Info("alerts updated", "count", len(enriched))
 }
 
 func fetchAndCacheTripUpdates(ctx context.Context, fetcher Fetcher, cache *RealtimeCache) {
@@ -420,20 +486,4 @@ func fetchAndCacheTripUpdates(ctx context.Context, fetcher Fetcher, cache *Realt
 	}
 	cache.SetTripUpdates(updates)
 	slog.Info("trip updates refreshed", "count", len(updates))
-}
-
-func fetchAndCacheAlerts(ctx context.Context, fetcher Fetcher, lookup RouteLookup, cache *RealtimeCache) {
-	data, err := fetcher.Fetch(ctx, "/Gtfs/Feed/Alerts")
-	if err != nil {
-		slog.Error("fetching alerts", "error", err)
-		return
-	}
-	raw, err := ParseAlerts(data)
-	if err != nil {
-		slog.Error("parsing alerts", "error", err)
-		return
-	}
-	enriched := EnrichAlerts(raw, lookup)
-	cache.SetAlerts(enriched)
-	slog.Info("alerts updated", "count", len(enriched))
 }

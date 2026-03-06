@@ -50,7 +50,7 @@ func main() {
 			slog.Warn("Metrolinx API fetch failed, falling back to simulated positions", "error", err)
 			gtfsstore.StartSimulatedPositionPoller(ctx, static, rtCache, 10*time.Second)
 		} else if _, parseErr := gtfsstore.ParsePositions(testData); parseErr != nil {
-			slog.Warn("Metrolinx API returned invalid protobuf, falling back to simulated positions", "error", parseErr)
+			slog.Warn("Metrolinx API returned invalid JSON, falling back to simulated positions", "error", parseErr)
 			gtfsstore.StartSimulatedPositionPoller(ctx, static, rtCache, 10*time.Second)
 		} else {
 			slog.Info("Metrolinx API key validated, starting real-time pollers")
