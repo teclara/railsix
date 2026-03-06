@@ -7,31 +7,17 @@
 
 	let expanded = $state(false);
 
+	let trainCount = $derived(positions.filter((p) => p.routeType === 2 || p.routeType === 0).length);
+	let busCount = $derived(positions.filter((p) => p.routeType === 3).length);
+
 	let routes = $derived(
 		[...new Map(positions.map((p) => [p.routeName, p.routeColor])).entries()]
 			.map(([name, color]) => ({ name, color }))
 			.sort((a, b) => a.name.localeCompare(b.name))
 	);
 
-	let activeFilterCount = $derived(
-		(filterState.showTrains ? 0 : 1) +
-			(filterState.showBuses ? 0 : 1) +
-			filterState.activeRoutes.length +
-			filterState.activeStatuses.length
-	);
-
 	function isRouteActive(routeName: string): boolean {
 		return filterState.activeRoutes.length === 0 || filterState.activeRoutes.includes(routeName);
-	}
-
-	const statuses = [
-		{ key: 'ontime', label: 'On Time' },
-		{ key: 'delayed', label: 'Delayed' },
-		{ key: 'cancelled', label: 'Cancelled' }
-	];
-
-	function isStatusActive(key: string): boolean {
-		return filterState.activeStatuses.length === 0 || filterState.activeStatuses.includes(key);
 	}
 </script>
 
@@ -40,26 +26,8 @@
 		<div
 			class="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg p-3 max-w-[calc(100vw-1.5rem)] space-y-2"
 		>
-			<div class="flex gap-1.5">
-				<button
-					class="px-3 py-1.5 rounded-full text-xs font-medium transition-all {filterState.showTrains
-						? 'bg-green-700 text-white'
-						: 'bg-gray-200 text-gray-500'}"
-					onclick={() => filters.toggleTrains()}
-				>
-					Train
-				</button>
-				<button
-					class="px-3 py-1.5 rounded-full text-xs font-medium transition-all {filterState.showBuses
-						? 'bg-blue-600 text-white'
-						: 'bg-gray-200 text-gray-500'}"
-					onclick={() => filters.toggleBuses()}
-				>
-					Bus
-				</button>
-			</div>
-
-			<div class="flex gap-1.5 overflow-x-auto max-w-[80vw] pb-1">
+			<p class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Routes</p>
+			<div class="flex gap-1.5 flex-wrap max-w-[80vw] max-h-40 overflow-y-auto pb-1">
 				{#each routes as route}
 					<button
 						class="px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all border"
@@ -73,55 +41,95 @@
 				{/each}
 			</div>
 
-			<div class="flex gap-1.5">
-				{#each statuses as status}
-					<button
-						class="px-3 py-1.5 rounded-full text-xs font-medium transition-all {isStatusActive(
-							status.key
-						)
-							? 'bg-gray-800 text-white'
-							: 'bg-gray-200 text-gray-500'}"
-						onclick={() => filters.toggleStatus(status.key)}
-					>
-						{status.label}
-					</button>
-				{/each}
+			<div class="flex items-center justify-between pt-1">
+				<button
+					class="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+					onclick={() => filters.reset()}
+				>
+					Reset filters
+				</button>
+				<button
+					class="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+					onclick={() => (expanded = false)}
+				>
+					Close
+				</button>
 			</div>
-
-			<button
-				class="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-				onclick={() => filters.reset()}
-			>
-				Reset filters
-			</button>
 		</div>
 	{/if}
 
-	<button
-		class="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors relative"
-		onclick={() => (expanded = !expanded)}
-		aria-label="Toggle filters"
-	>
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			class="w-5 h-5 text-gray-700"
-			fill="none"
-			viewBox="0 0 24 24"
-			stroke="currentColor"
-			stroke-width="2"
+	<!-- Always-visible vehicle type selector -->
+	<div class="flex items-center gap-1.5">
+		<button
+			class="h-10 px-4 rounded-full shadow-lg flex items-center gap-2 transition-all text-sm font-medium {filterState.showTrains
+				? 'bg-green-700 text-white'
+				: 'bg-white text-gray-400 hover:bg-gray-50'}"
+			onclick={() => filters.toggleTrains()}
 		>
-			<path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-			/>
-		</svg>
-		{#if activeFilterCount > 0}
+			<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M4 15V5a3 3 0 013-3h10a3 3 0 013 3v10M4 15l-2 4h20l-2-4M4 15h16" />
+				<circle cx="8.5" cy="18.5" r="1.5" fill="currentColor" />
+				<circle cx="15.5" cy="18.5" r="1.5" fill="currentColor" />
+				<path d="M9 6h6M9 10h6" />
+			</svg>
+			Trains
 			<span
-				class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center"
+				class="text-xs rounded-full px-1.5 py-0.5 {filterState.showTrains
+					? 'bg-green-800/40'
+					: 'bg-gray-200'}"
 			>
-				{activeFilterCount}
+				{trainCount}
 			</span>
-		{/if}
-	</button>
+		</button>
+
+		<button
+			class="h-10 px-4 rounded-full shadow-lg flex items-center gap-2 transition-all text-sm font-medium {filterState.showBuses
+				? 'bg-blue-600 text-white'
+				: 'bg-white text-gray-400 hover:bg-gray-50'}"
+			onclick={() => filters.toggleBuses()}
+		>
+			<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M3 17V7a4 4 0 014-4h10a4 4 0 014 4v10M3 17l-1 2h20l-1-2M3 17h18" />
+				<circle cx="7" cy="19.5" r="1.5" fill="currentColor" />
+				<circle cx="17" cy="19.5" r="1.5" fill="currentColor" />
+				<path d="M5 7h14v5H5z" />
+			</svg>
+			Buses
+			<span
+				class="text-xs rounded-full px-1.5 py-0.5 {filterState.showBuses
+					? 'bg-blue-700/40'
+					: 'bg-gray-200'}"
+			>
+				{busCount}
+			</span>
+		</button>
+
+		<button
+			class="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors relative"
+			onclick={() => (expanded = !expanded)}
+			aria-label="Filter by route"
+		>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="w-5 h-5 text-gray-700"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				stroke-width="2"
+			>
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+				/>
+			</svg>
+			{#if filterState.activeRoutes.length > 0}
+				<span
+					class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center"
+				>
+					{filterState.activeRoutes.length}
+				</span>
+			{/if}
+		</button>
+	</div>
 </div>
