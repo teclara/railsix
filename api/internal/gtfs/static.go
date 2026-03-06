@@ -29,12 +29,20 @@ type TripStop struct {
 	DepartureTime time.Duration
 }
 
+// ShapePoint is a [lat, lon] point along a trip's route geometry.
+type ShapePoint struct {
+	Lat float64
+	Lon float64
+}
+
 // SimTrip holds a trip's identity and full stop sequence for position simulation.
 type SimTrip struct {
 	TripID    string
 	RouteID   string
 	ServiceID string
 	Stops     []TripStop
+	Shape     []ShapePoint // route geometry; empty if no shape data
+	StopSnap  []int        // Shape index closest to each stop; len == len(Stops)
 }
 
 type StaticStore struct {
@@ -155,13 +163,13 @@ func (s *StaticStore) load(zipData []byte) error {
 		if trip.Route == nil || trip.Service == nil {
 			continue
 		}
-		stops := make([]TripStop, 0, len(trip.StopTimes))
+		tripStops := make([]TripStop, 0, len(trip.StopTimes))
 		for j := range trip.StopTimes {
 			st := &trip.StopTimes[j]
 			if st.Stop == nil || st.Stop.Latitude == nil || st.Stop.Longitude == nil {
 				continue
 			}
-			stops = append(stops, TripStop{
+			tripStops = append(tripStops, TripStop{
 				StopID:        st.Stop.Id,
 				Lat:           *st.Stop.Latitude,
 				Lon:           *st.Stop.Longitude,
@@ -169,15 +177,28 @@ func (s *StaticStore) load(zipData []byte) error {
 				DepartureTime: st.DepartureTime,
 			})
 		}
-		if len(stops) < 2 {
+		if len(tripStops) < 2 {
 			continue // need at least 2 stops to interpolate
 		}
-		tripIndex[trip.ID] = SimTrip{
+
+		sim := SimTrip{
 			TripID:    trip.ID,
 			RouteID:   trip.Route.Id,
 			ServiceID: trip.Service.Id,
-			Stops:     stops,
+			Stops:     tripStops,
 		}
+
+		// Attach shape geometry and snap stops to nearest shape points
+		if trip.Shape != nil && len(trip.Shape.Points) >= 2 {
+			shape := make([]ShapePoint, len(trip.Shape.Points))
+			for j, sp := range trip.Shape.Points {
+				shape[j] = ShapePoint{Lat: sp.Latitude, Lon: sp.Longitude}
+			}
+			sim.Shape = shape
+			sim.StopSnap = snapStopsToShape(tripStops, shape)
+		}
+
+		tripIndex[trip.ID] = sim
 	}
 
 	// --- Route shapes: pick the longest shape per rail route ---
@@ -376,4 +397,32 @@ func serviceActive(svc *gtfs.Service, date time.Time) bool {
 
 func truncateToDay(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+// snapStopsToShape maps each trip stop to the nearest shape point index.
+// Searches forward only to preserve ordering along the shape.
+func snapStopsToShape(stops []TripStop, shape []ShapePoint) []int {
+	snap := make([]int, len(stops))
+	searchFrom := 0
+	for i, st := range stops {
+		bestIdx := searchFrom
+		bestDist := distSq(st.Lat, st.Lon, shape[searchFrom].Lat, shape[searchFrom].Lon)
+		for j := searchFrom + 1; j < len(shape); j++ {
+			d := distSq(st.Lat, st.Lon, shape[j].Lat, shape[j].Lon)
+			if d < bestDist {
+				bestDist = d
+				bestIdx = j
+			}
+		}
+		snap[i] = bestIdx
+		searchFrom = bestIdx
+	}
+	return snap
+}
+
+// distSq returns the squared Euclidean distance (good enough for nearest-point comparison).
+func distSq(lat1, lon1, lat2, lon2 float64) float64 {
+	dlat := lat1 - lat2
+	dlon := lon1 - lon2
+	return dlat*dlat + dlon*dlon
 }
