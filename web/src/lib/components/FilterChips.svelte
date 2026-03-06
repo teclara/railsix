@@ -2,10 +2,8 @@
 	import type { VehiclePosition } from '$lib/api';
 	import { filters, type FilterState } from '$lib/stores/filters';
 
-	let {
-		positions = [],
-		filterState
-	}: { positions: VehiclePosition[]; filterState: FilterState } = $props();
+	let { positions = [], filterState }: { positions: VehiclePosition[]; filterState: FilterState } =
+		$props();
 
 	let expanded = $state(false);
 
@@ -78,7 +76,9 @@
 			<div class="flex gap-1.5">
 				{#each statuses as status}
 					<button
-						class="px-3 py-1.5 rounded-full text-xs font-medium transition-all {isStatusActive(status.key)
+						class="px-3 py-1.5 rounded-full text-xs font-medium transition-all {isStatusActive(
+							status.key
+						)
 							? 'bg-gray-800 text-white'
 							: 'bg-gray-200 text-gray-500'}"
 						onclick={() => filters.toggleStatus(status.key)}
