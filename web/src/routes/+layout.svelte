@@ -63,10 +63,6 @@
 		<span class="icon">⊟</span>
 		<span class="label">Dashboard</span>
 	</a>
-	<a href="/map" class="nav-item" class:active={path === '/map'}>
-		<span class="icon">◎</span>
-		<span class="label">Map</span>
-	</a>
 	<a href="/board" class="nav-item" class:active={path === '/board'}>
 		<span class="icon">▤</span>
 		<span class="label">Board</span>

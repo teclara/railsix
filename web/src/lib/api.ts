@@ -26,20 +26,6 @@ export interface Stop {
 	parentId?: string;
 }
 
-export interface VehiclePosition {
-	vehicleId: string;
-	tripId: string;
-	routeId: string;
-	routeName: string;
-	routeColor: string;
-	routeType: number;
-	lat: number;
-	lon: number;
-	bearing?: number;
-	speed?: number;
-	timestamp: number;
-}
-
 export interface Alert {
 	id: string;
 	effect: string;
@@ -52,43 +38,6 @@ export interface Alert {
 	endTime?: number;
 }
 
-export interface RouteShape {
-	routeId: string;
-	routeName: string;
-	color: string;
-	points: [number, number][]; // [lon, lat]
-}
-
-export function getRouteShapes() {
-	return fetchApi<RouteShape[]>('/api/shapes');
-}
-
-export interface UpcomingStop {
-	name: string;
-	platform?: string;
-	time: string;
-	delayMinutes: number;
-}
-
-export interface TripDetail {
-	tripId: string;
-	vehicleId: string;
-	routeName: string;
-	routeColor: string;
-	origin: string;
-	destination: string;
-	scheduleStart: string;
-	scheduleEnd: string;
-	status: string;
-	delayMinutes: number;
-	currentStop?: string;
-	upcomingStops: UpcomingStop[];
-}
-
-export function getTripDetail(tripId: string) {
-	return fetchApi<TripDetail>(`/api/trip/${tripId}`);
-}
-
 export function getAllStops() {
 	return fetchApi<Stop[]>('/api/stops');
 }
@@ -98,10 +47,6 @@ export function getStopDepartures(stopCode: string, destCode?: string) {
 		? `/api/departures/${stopCode}?dest=${encodeURIComponent(destCode)}`
 		: `/api/departures/${stopCode}`;
 	return fetchApi(url);
-}
-
-export function getPositions() {
-	return fetchApi<VehiclePosition[]>('/api/positions');
 }
 
 export function getAlerts() {
