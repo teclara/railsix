@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy, untrack } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import {
 		fetchUnionDepartures,
 		fetchDepartures,
@@ -15,7 +15,8 @@
 		return [...deps].sort((a, b) => a.time.localeCompare(b.time));
 	}
 
-	let departures = $state<UnionDeparture[]>(untrack(() => sortByTime(data.departures)));
+	let polledDepartures = $state<UnionDeparture[] | null>(null);
+	let departures = $derived(sortByTime(polledDepartures ?? data.departures));
 	let clock = $state('');
 	let clockInterval: ReturnType<typeof setInterval>;
 	let pollInterval: ReturnType<typeof setInterval>;
@@ -55,7 +56,7 @@
 			stationDepartures = deps;
 		} else {
 			const deps = await fetchUnionDepartures();
-			if (deps.length > 0) departures = sortByTime(deps);
+			if (deps.length > 0) polledDepartures = deps;
 		}
 	}
 
