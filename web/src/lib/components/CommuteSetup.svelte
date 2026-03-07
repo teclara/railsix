@@ -41,15 +41,15 @@
 	function save() {
 		if (!workOrigin || !workDest || !homeOrigin || !homeDest) return;
 		commute.setTrip('toWork', {
-			originCode: workOrigin.code,
+			originCode: workOrigin.code || workOrigin.id,
 			originName: workOrigin.name,
-			destinationCode: workDest.code,
+			destinationCode: workDest.code || workDest.id,
 			destinationName: workDest.name
 		});
 		commute.setTrip('toHome', {
-			originCode: homeOrigin.code,
+			originCode: homeOrigin.code || homeOrigin.id,
 			originName: homeOrigin.name,
-			destinationCode: homeDest.code,
+			destinationCode: homeDest.code || homeDest.id,
 			destinationName: homeDest.name
 		});
 	}

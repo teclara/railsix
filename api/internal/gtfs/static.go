@@ -120,13 +120,22 @@ func (s *StaticStore) load(zipData []byte) error {
 	stopCodes := make(map[string][]string)
 	for i := range static.Stops {
 		gs := &static.Stops[i]
-		if gs.Code == "" {
-			continue
+		// Use stop_code as the lookup key; fall back to stop_id for stations
+		// (e.g. GO train stations) that have no stop_code in the GTFS data.
+		key := gs.Code
+		if key == "" {
+			key = gs.Id
 		}
-		stopCodes[gs.Code] = append(stopCodes[gs.Code], gs.Id)
-		// Also index child stops under the parent's code.
-		if gs.Parent != nil && gs.Parent.Code != "" {
-			stopCodes[gs.Parent.Code] = appendUnique(stopCodes[gs.Parent.Code], gs.Id)
+		stopCodes[key] = append(stopCodes[key], gs.Id)
+		// Also index child stops under the parent's key.
+		if gs.Parent != nil {
+			parentKey := gs.Parent.Code
+			if parentKey == "" {
+				parentKey = gs.Parent.Id
+			}
+			if parentKey != "" {
+				stopCodes[parentKey] = appendUnique(stopCodes[parentKey], gs.Id)
+			}
 		}
 	}
 
