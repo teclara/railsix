@@ -1,5 +1,5 @@
-const CACHE_NAME = 'sixrail-v1';
-const STATIC_ASSETS = ['/', '/map', '/manifest.json'];
+const CACHE_NAME = 'sixrail-v2';
+const STATIC_ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
 	event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)));

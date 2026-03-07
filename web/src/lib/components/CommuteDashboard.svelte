@@ -189,7 +189,7 @@
 		<!-- Network health bar -->
 		{#if networkHealth.length > 0}
 			<div class="network-health flex flex-wrap gap-2 justify-center py-2 border-b border-[#222]">
-				{#each networkHealth.sort((a, b) => a.lineCode.localeCompare(b.lineCode)) as line}
+				{#each networkHealth.toSorted((a, b) => a.lineCode.localeCompare(b.lineCode)) as line}
 					<div
 						class="flex items-center gap-1 px-2 py-0.5 rounded bg-[#1a1a1a] text-xs"
 						title="{line.lineName}: {line.activeTrips} active trains"
