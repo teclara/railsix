@@ -346,7 +346,7 @@
 	<link href="https://api.mapbox.com/mapbox-gl-js/v3.19.0/mapbox-gl.css" rel="stylesheet" />
 </svelte:head>
 
-<div class="relative w-screen h-screen overflow-hidden">
+<div class="relative w-screen overflow-hidden" style="height: calc(100vh - 60px)">
 	<div class="absolute inset-0">
 		<div bind:this={mapContainer} class="w-full h-full"></div>
 	</div>
