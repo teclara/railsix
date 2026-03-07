@@ -38,6 +38,7 @@ type Departure struct {
 	Line          string `json:"line"`
 	Destination   string `json:"destination"`
 	ScheduledTime string `json:"scheduledTime"` // "HH:MM" local time
+	ArrivalTime   string `json:"arrivalTime,omitempty"` // "HH:MM" arrival at destination stop
 	Status        string `json:"status"`        // "On Time", "Delayed +Xm", "Cancelled"
 	Platform      string `json:"platform,omitempty"`
 	RouteColor    string `json:"routeColor,omitempty"`
@@ -71,6 +72,29 @@ type UpcomingStop struct {
 	Platform     string `json:"platform,omitempty"`
 	Time         string `json:"time"`         // "4:27 p.m."
 	DelayMinutes int    `json:"delayMinutes"`
+}
+
+// NextServiceLine is a single real-time next-service entry from Metrolinx NextService API.
+type NextServiceLine struct {
+	LineCode      string `json:"lineCode"`
+	LineName      string `json:"lineName"`
+	Direction     string `json:"direction"`
+	ScheduledTime string `json:"scheduledTime"` // "HH:MM"
+	ComputedTime  string `json:"computedTime"`  // "HH:MM" real-time adjusted
+	Platform      string `json:"platform,omitempty"`
+	ActualPlatform string `json:"actualPlatform,omitempty"`
+	TripNumber    string `json:"tripNumber"`
+	Status        string `json:"status"` // "On Time", "Delayed", "Moving"
+}
+
+// UnionDeparture is a single departure from the Union Station departures board.
+type UnionDeparture struct {
+	TripNumber string   `json:"tripNumber"`
+	Service    string   `json:"service"`
+	Platform   string   `json:"platform"`
+	Time       string   `json:"time"` // "HH:MM"
+	Info       string   `json:"info"` // "Proceed", "Wait", etc.
+	Stops      []string `json:"stops"`
 }
 
 type Alert struct {

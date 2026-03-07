@@ -51,7 +51,7 @@
 		}
 		loading = true;
 		try {
-			departures = await fetchDepartures(activeTrip.originCode);
+			departures = await fetchDepartures(activeTrip.originCode, activeTrip.destinationCode);
 		} catch {
 			departures = [];
 		} finally {

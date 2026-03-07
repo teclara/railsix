@@ -48,18 +48,17 @@
 </script>
 
 <span class="split-flap-char" style="--flip-delay: {delay}ms">
-	<span class="tile top">{topValue}</span>
-	<span class="tile bottom">{bottomValue}</span>
+	<span class="tile top"><span class="char">{topValue}</span></span>
+	<span class="tile bottom"><span class="char">{bottomValue}</span></span>
 	{#if isFlipping}
-		<span class="tile flipping">{topValue}</span>
+		<span class="tile flipping"><span class="char">{topValue}</span></span>
 	{/if}
 </span>
 
 <style>
 	.split-flap-char {
 		position: relative;
-		display: inline-flex;
-		flex-direction: column;
+		display: inline-block;
 		width: 1ch;
 		height: 1.4em;
 		background: #1e1e1e;
@@ -74,23 +73,17 @@
 		position: absolute;
 		width: 100%;
 		height: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		overflow: hidden;
-		line-height: 2;
 	}
 
 	.tile.top {
 		top: 0;
-		align-items: flex-end;
 		background: #1e1e1e;
 		border-bottom: 1px solid #000;
 	}
 
 	.tile.bottom {
 		bottom: 0;
-		align-items: flex-start;
 		background: #181818;
 	}
 
@@ -101,6 +94,30 @@
 		transform-origin: center;
 		background: #1e1e1e;
 		z-index: 2;
+	}
+
+	/* .char spans the full character height (200% of its half-tile parent)
+	   so the glyph center sits exactly at the fold line between tiles */
+	.char {
+		position: absolute;
+		width: 100%;
+		height: 200%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tile.top .char {
+		top: 0; /* glyph center at tile bottom → shows top half */
+	}
+
+	.tile.bottom .char {
+		bottom: 0; /* glyph center at tile top → shows bottom half */
+	}
+
+	.tile.flipping .char {
+		height: 100%; /* flipping tile is already full height */
+		top: 0;
 	}
 
 	@keyframes flip {

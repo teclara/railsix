@@ -39,33 +39,37 @@ func main() {
 	// Realtime cache + background pollers
 	rtCache := gtfsstore.NewRealtimeCache()
 	ctx := context.Background()
+	var mxClient *metrolinx.Client
 	if cfg.MetrolinxAPIKey == "" {
 		slog.Info("METROLINX_API_KEY not set — using simulated vehicle positions")
 		gtfsstore.StartSimulatedPositionPoller(ctx, static, rtCache, 10*time.Second)
 	} else {
-		client := metrolinx.NewClient(cfg.MetrolinxBaseURL, cfg.MetrolinxAPIKey)
+		mxClient = metrolinx.NewClient(cfg.MetrolinxBaseURL, cfg.MetrolinxAPIKey)
 		// Validate API key by fetching AND parsing a GTFS-RT feed
-		testData, err := client.Fetch(ctx, "/Gtfs/Feed/VehiclePosition")
+		testData, err := mxClient.Fetch(ctx, "/Gtfs/Feed/VehiclePosition")
 		if err != nil {
 			slog.Warn("Metrolinx API fetch failed, falling back to simulated positions", "error", err)
 			gtfsstore.StartSimulatedPositionPoller(ctx, static, rtCache, 10*time.Second)
+			mxClient = nil
 		} else if _, parseErr := gtfsstore.ParsePositions(testData); parseErr != nil {
 			slog.Warn("Metrolinx API returned invalid JSON, falling back to simulated positions", "error", parseErr)
 			gtfsstore.StartSimulatedPositionPoller(ctx, static, rtCache, 10*time.Second)
+			mxClient = nil
 		} else {
 			slog.Info("Metrolinx API key validated, starting real-time pollers")
-			gtfsstore.StartPositionPoller(ctx, client, static, rtCache, 10*time.Second)
-			gtfsstore.StartAlertPoller(ctx, client, static, rtCache, 30*time.Second)
-			gtfsstore.StartTripUpdatePoller(ctx, client, rtCache, 30*time.Second)
+			gtfsstore.StartPositionPoller(ctx, mxClient, static, rtCache, 10*time.Second)
+			gtfsstore.StartAlertPoller(ctx, mxClient, static, rtCache, 30*time.Second)
+			gtfsstore.StartTripUpdatePoller(ctx, mxClient, rtCache, 30*time.Second)
 		}
 	}
 
-	h := handlers.New(static, rtCache)
+	h := handlers.New(static, rtCache, mxClient)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", h.Health)
 	mux.HandleFunc("GET /api/stops", h.AllStops)
 	mux.HandleFunc("GET /api/departures/{stopCode}", h.StopDepartures)
+	mux.HandleFunc("GET /api/union-departures", h.UnionDepartures)
 	mux.HandleFunc("GET /api/shapes", h.RouteShapes)
 	mux.HandleFunc("GET /api/trip/{tripId}", h.TripDetail)
 	mux.HandleFunc("GET /api/positions", h.Positions)

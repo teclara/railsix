@@ -338,6 +338,27 @@ func (s *StaticStore) DeparturesForStop(stopID string) []ScheduledDeparture {
 	return out
 }
 
+// ArrivalTimeAtStop returns the scheduled arrival duration-from-midnight for a trip
+// at the first matching stop from destStopIDs. Returns 0, false if not found.
+func (s *StaticStore) ArrivalTimeAtStop(tripID string, destStopIDs []string) (time.Duration, bool) {
+	s.mu.RLock()
+	sim, ok := s.tripIndex[tripID]
+	s.mu.RUnlock()
+	if !ok {
+		return 0, false
+	}
+	destSet := make(map[string]bool, len(destStopIDs))
+	for _, id := range destStopIDs {
+		destSet[id] = true
+	}
+	for _, ts := range sim.Stops {
+		if destSet[ts.StopID] {
+			return ts.ArrivalTime, true
+		}
+	}
+	return 0, false
+}
+
 // IsServiceActive returns true if the given service is operating on the given date.
 func (s *StaticStore) IsServiceActive(serviceID string, date time.Time) bool {
 	s.mu.RLock()

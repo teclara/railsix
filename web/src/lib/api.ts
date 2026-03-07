@@ -93,8 +93,11 @@ export function getAllStops() {
 	return fetchApi<Stop[]>('/api/stops');
 }
 
-export function getStopDepartures(stopCode: string) {
-	return fetchApi(`/api/departures/${stopCode}`);
+export function getStopDepartures(stopCode: string, destCode?: string) {
+	const url = destCode
+		? `/api/departures/${stopCode}?dest=${encodeURIComponent(destCode)}`
+		: `/api/departures/${stopCode}`;
+	return fetchApi(url);
 }
 
 export function getPositions() {
@@ -103,4 +106,8 @@ export function getPositions() {
 
 export function getAlerts() {
 	return fetchApi<Alert[]>('/api/alerts');
+}
+
+export function getUnionDepartures() {
+	return fetchApi('/api/union-departures');
 }

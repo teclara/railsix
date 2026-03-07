@@ -16,7 +16,8 @@ const (
 
 // GetDepartures returns upcoming departures for a stop code, merging static schedule
 // with real-time trip updates. Falls back gracefully if updates are unavailable.
-func GetDepartures(stopCode string, now time.Time, static *StaticStore, rt *RealtimeCache) []models.Departure {
+// If destCode is non-empty, ArrivalTime is populated for each departure.
+func GetDepartures(stopCode, destCode string, now time.Time, static *StaticStore, rt *RealtimeCache) []models.Departure {
 	loc, err := time.LoadLocation(torontoTZ)
 	if err != nil {
 		loc = time.UTC
@@ -26,6 +27,11 @@ func GetDepartures(stopCode string, now time.Time, static *StaticStore, rt *Real
 	stopIDs := static.StopIDsForCode(stopCode)
 	if len(stopIDs) == 0 {
 		return []models.Departure{}
+	}
+
+	var destStopIDs []string
+	if destCode != "" {
+		destStopIDs = static.StopIDsForCode(destCode)
 	}
 
 	// Determine active service IDs for today (and yesterday for past-midnight trips).
@@ -98,14 +104,20 @@ func GetDepartures(stopCode string, now time.Time, static *StaticStore, rt *Real
 			}
 		}
 
-		result = append(result, models.Departure{
+		dep := models.Departure{
 			Line:          route.ShortName,
 			Destination:   c.dep.Headsign,
 			ScheduledTime: formatTime(c.serviceDay.Add(c.dep.DepartureTime)),
 			Status:        status,
 			RouteColor:    route.Color,
 			DelayMinutes:  delayMin,
-		})
+		}
+		if len(destStopIDs) > 0 {
+			if arrDur, ok := static.ArrivalTimeAtStop(c.dep.TripID, destStopIDs); ok {
+				dep.ArrivalTime = formatTime(c.serviceDay.Add(arrDur))
+			}
+		}
+		result = append(result, dep)
 
 		if len(result) >= maxDepartures {
 			break

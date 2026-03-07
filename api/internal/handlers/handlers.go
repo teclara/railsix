@@ -9,6 +9,7 @@ import (
 	"time"
 
 	gtfsstore "github.com/teclara/sixrail/api/internal/gtfs"
+	"github.com/teclara/sixrail/api/internal/metrolinx"
 	"github.com/teclara/sixrail/api/internal/models"
 )
 
@@ -18,10 +19,11 @@ var tripIDRe = regexp.MustCompile(`^[A-Za-z0-9._-]{1,80}$`)
 type Handlers struct {
 	static *gtfsstore.StaticStore
 	rt     *gtfsstore.RealtimeCache
+	mx     *metrolinx.Client // nil when no API key is configured
 }
 
-func New(static *gtfsstore.StaticStore, rt *gtfsstore.RealtimeCache) *Handlers {
-	return &Handlers{static: static, rt: rt}
+func New(static *gtfsstore.StaticStore, rt *gtfsstore.RealtimeCache, mx *metrolinx.Client) *Handlers {
+	return &Handlers{static: static, rt: rt, mx: mx}
 }
 
 func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
@@ -182,13 +184,88 @@ func (h *Handlers) TripDetail(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, detail)
 }
 
-// StopDepartures returns GTFS-based departures for a stop code.
+// StopDepartures returns GTFS-based departures for a stop code, enriched with
+// real-time NextService data (platform + computed time) when available.
+// Optional query param ?dest=<stopCode> populates ArrivalTime at the destination.
 func (h *Handlers) StopDepartures(w http.ResponseWriter, r *http.Request) {
 	stopCode := r.PathValue("stopCode")
 	if !stopCodeRe.MatchString(stopCode) {
 		jsonError(w, "invalid stop code", http.StatusBadRequest)
 		return
 	}
-	departures := gtfsstore.GetDepartures(stopCode, time.Now(), h.static, h.rt)
+	destCode := r.URL.Query().Get("dest")
+	if destCode != "" && !stopCodeRe.MatchString(destCode) {
+		destCode = ""
+	}
+	departures := gtfsstore.GetDepartures(stopCode, destCode, time.Now(), h.static, h.rt)
+
+	// Enrich with Metrolinx NextService real-time data when available.
+	// NextService returns one entry per line/direction (the very next departure).
+	// We match by line code and pick the NS entry whose ComputedTime is within
+	// 10 minutes of the GTFS scheduled time.
+	if h.mx != nil && len(departures) > 0 {
+		if nsLines, err := h.mx.GetNextService(r.Context(), stopCode); err == nil {
+			// Build a map: lineCode → []NextServiceLine
+			byLine := make(map[string][]models.NextServiceLine, len(nsLines))
+			for _, l := range nsLines {
+				byLine[l.LineCode] = append(byLine[l.LineCode], l)
+			}
+			for i := range departures {
+				candidates := byLine[departures[i].Line]
+				ns := bestNSMatch(departures[i].ScheduledTime, candidates)
+				if ns == nil {
+					continue
+				}
+				if ns.ComputedTime != "--:--" {
+					departures[i].ScheduledTime = ns.ComputedTime
+				}
+				if ns.ActualPlatform != "" {
+					departures[i].Platform = ns.ActualPlatform
+				} else if ns.Platform != "" && departures[i].Platform == "" {
+					departures[i].Platform = ns.Platform
+				}
+			}
+		}
+	}
+
 	respondJSON(w, departures)
+}
+
+// bestNSMatch returns the NextServiceLine whose ComputedTime is within 10 minutes
+// of the given "HH:MM" scheduled time, or nil if none match.
+func bestNSMatch(scheduledHHMM string, candidates []models.NextServiceLine) *models.NextServiceLine {
+	sched, err := time.Parse("15:04", scheduledHHMM)
+	if err != nil {
+		return nil
+	}
+	const window = 10 * time.Minute
+	for i := range candidates {
+		comp, err := time.Parse("15:04", candidates[i].ComputedTime)
+		if err != nil {
+			continue
+		}
+		diff := comp.Sub(sched)
+		if diff < 0 {
+			diff = -diff
+		}
+		if diff <= window {
+			return &candidates[i]
+		}
+	}
+	return nil
+}
+
+// UnionDepartures returns live departures from Union Station via the Metrolinx REST API.
+func (h *Handlers) UnionDepartures(w http.ResponseWriter, r *http.Request) {
+	if h.mx == nil {
+		respondJSON(w, []models.UnionDeparture{})
+		return
+	}
+	deps, err := h.mx.GetUnionDepartures(r.Context())
+	if err != nil {
+		slog.Warn("union departures fetch failed", "error", err)
+		respondJSON(w, []models.UnionDeparture{})
+		return
+	}
+	respondJSON(w, deps)
 }

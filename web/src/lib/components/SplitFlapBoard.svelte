@@ -39,6 +39,7 @@
 		<span class="col-time text-gray-500 text-xs uppercase tracking-widest">Time</span>
 		<span class="col-route text-gray-500 text-xs uppercase tracking-widest">Route</span>
 		<span class="col-platform text-gray-500 text-xs uppercase tracking-widest">Plat</span>
+		<span class="col-arrival text-gray-500 text-xs uppercase tracking-widest">Arrv</span>
 		<span class="col-status text-gray-500 text-xs uppercase tracking-widest">Status</span>
 	</div>
 
@@ -52,7 +53,7 @@
 			</span>
 
 			<span class="col-route text-white">
-				{#each padRight(dep.line, 14).split('') as char, j}
+				{#each padRight(dep.line, 12).split('') as char, j}
 					<SplitFlapChar value={char} delay={50 + j * 20} />
 				{/each}
 			</span>
@@ -63,8 +64,14 @@
 				{/each}
 			</span>
 
+			<span class="col-arrival text-amber-300">
+				{#each padRight(dep.arrivalTime ?? '-----', 5).split('') as char, j}
+					<SplitFlapChar value={char} delay={110 + j * 25} />
+				{/each}
+			</span>
+
 			<span class="col-status {statusClass(dep)}">
-				{#each padRight(statusText(dep), 14).split('') as char, j}
+				{#each padRight(statusText(dep), 11).split('') as char, j}
 					<SplitFlapChar value={char} delay={120 + j * 15} />
 				{/each}
 			</span>
@@ -90,7 +97,7 @@
 	.board-header,
 	.board-row {
 		display: grid;
-		grid-template-columns: 5ch 15ch 5ch 15ch;
+		grid-template-columns: 5ch 12ch 4ch 5ch 11ch;
 		gap: 8px;
 		align-items: center;
 		padding: 4px 0;
@@ -108,15 +115,13 @@
 	}
 
 	.board-row.next-train {
-		background: #1a1600;
-		border-radius: 4px;
-		padding: 8px 4px;
-		font-size: 1.1em;
+		padding: 8px 0;
 	}
 
 	.col-time,
 	.col-route,
 	.col-platform,
+	.col-arrival,
 	.col-status {
 		display: flex;
 		flex-wrap: nowrap;
@@ -133,6 +138,9 @@
 	.col-platform {
 		font-size: 0.85em;
 	}
+	.col-arrival {
+		font-size: 0.85em;
+	}
 	.col-status {
 		font-size: 0.8em;
 		letter-spacing: 0.05em;
@@ -141,7 +149,7 @@
 	@media (max-width: 480px) {
 		.board-header,
 		.board-row {
-			grid-template-columns: 5ch 12ch 4ch 12ch;
+			grid-template-columns: 5ch 10ch 3ch 5ch 9ch;
 			gap: 4px;
 		}
 	}
