@@ -82,14 +82,17 @@ func GetDepartures(stopCode, destCode string, now time.Time, static *StaticStore
 		return candidates[i].adjusted.Before(candidates[j].adjusted)
 	})
 
-	// Deduplicate by tripID — same trip can appear for parent + child stops.
+	// Deduplicate by trip number — same physical train can have multiple GTFS
+	// trip IDs due to different service date prefixes (e.g. 20260301-LW-1731
+	// vs 20260424-LW-1731 are the same train 1731).
 	seen := make(map[string]bool)
 	result := make([]models.Departure, 0, maxDepartures)
 	for _, c := range candidates {
-		if seen[c.dep.TripID] {
+		tripNum := extractTripNumber(c.dep.TripID)
+		if seen[tripNum] {
 			continue
 		}
-		seen[c.dep.TripID] = true
+		seen[tripNum] = true
 
 		route, _ := static.GetRoute(c.dep.RouteID)
 		delay := c.adjusted.Sub(c.serviceDay.Add(c.dep.DepartureTime))

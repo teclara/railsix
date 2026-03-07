@@ -49,14 +49,34 @@
 
 <div class="split-flap-board font-mono select-none" role="region" aria-label="Departure board">
 	<!-- Header -->
-	<div class="board-header">
-		<span class="col-time text-gray-500 text-xs uppercase tracking-widest">Time</span>
-		<span class="col-route text-gray-500 text-xs uppercase tracking-widest">Route</span>
-		<span class="col-cars text-gray-500 text-xs uppercase tracking-widest">Cars</span>
-		<span class="col-platform text-gray-500 text-xs uppercase tracking-widest">Plat</span>
-		<span class="col-arrival text-gray-500 text-xs uppercase tracking-widest">Arrv</span>
-		<span class="col-occ text-gray-500 text-xs uppercase tracking-widest"></span>
-		<span class="col-status text-gray-500 text-xs uppercase tracking-widest">Status</span>
+	<div class="board-row board-header-row">
+		<span class="col-time text-amber-400">
+			{#each padRight('TIME', 5).split('') as char}
+				<SplitFlapChar value={char} delay={0} />
+			{/each}
+		</span>
+		<span class="col-route text-white">
+			{#each padRight('ROUTE', 10).split('') as char}
+				<SplitFlapChar value={char} delay={0} />
+			{/each}
+		</span>
+		<span class="col-cars text-gray-400 text-xs">CRS</span>
+		<span class="col-platform text-white">
+			{#each padRight('PLAT', 4).split('') as char}
+				<SplitFlapChar value={char} delay={0} />
+			{/each}
+		</span>
+		<span class="col-arrival text-amber-300">
+			{#each padRight('ARRV', 5).split('') as char}
+				<SplitFlapChar value={char} delay={0} />
+			{/each}
+		</span>
+		<span class="col-occ text-gray-400"></span>
+		<span class="col-status text-gray-400">
+			{#each padRight('STATUS', 11).split('') as char}
+				<SplitFlapChar value={char} delay={0} />
+			{/each}
+		</span>
 	</div>
 
 	<!-- Rows -->
@@ -127,7 +147,6 @@
 		overflow: hidden;
 	}
 
-	.board-header,
 	.board-row {
 		display: grid;
 		grid-template-columns: 5ch 10ch 3ch 4ch 5ch 2ch 11ch;
@@ -136,7 +155,7 @@
 		padding: 4px 0;
 	}
 
-	.board-header {
+	.board-header-row {
 		border-bottom: 1px solid #222;
 		margin-bottom: 8px;
 		padding-bottom: 8px;
@@ -195,7 +214,6 @@
 	}
 
 	@media (max-width: 480px) {
-		.board-header,
 		.board-row {
 			grid-template-columns: 5ch 8ch 3ch 3ch 5ch 2ch 9ch;
 			gap: 3px;
