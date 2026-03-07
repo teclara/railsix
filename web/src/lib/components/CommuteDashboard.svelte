@@ -89,9 +89,9 @@
 		loadDepartures();
 	});
 
-	let activeRouteNames = $derived(
-		activeTrip ? [activeTrip.originName, activeTrip.destinationName] : []
-	);
+	// Pass empty array — AlertBanner shows all alerts when no route filter is provided
+	// TODO: store route names in commute trips to enable route-specific filtering
+	let activeRouteNames = $derived<string[]>([]);
 
 	async function requestNotifications() {
 		if (!('Notification' in window)) return;

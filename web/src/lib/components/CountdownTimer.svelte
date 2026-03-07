@@ -1,10 +1,9 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onDestroy } from 'svelte';
 
 	let { scheduledTime }: { scheduledTime: string } = $props();
 
 	let display = $state('--:--');
-	let interval: ReturnType<typeof setInterval>;
 
 	function computeCountdown(scheduled: string): string {
 		const now = new Date();
@@ -19,17 +18,20 @@
 		return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 	}
 
-	onMount(() => {
-		display = computeCountdown(scheduledTime);
+	let interval: ReturnType<typeof setInterval> | undefined;
+
+	$effect(() => {
+		// Re-run whenever scheduledTime changes
+		const st = scheduledTime;
+		display = computeCountdown(st);
+		if (interval) clearInterval(interval);
 		interval = setInterval(() => {
-			display = computeCountdown(scheduledTime);
+			display = computeCountdown(st);
 		}, 1000);
 	});
 
-	onDestroy(() => clearInterval(interval));
-
-	$effect(() => {
-		display = computeCountdown(scheduledTime);
+	onDestroy(() => {
+		if (interval) clearInterval(interval);
 	});
 </script>
 

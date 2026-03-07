@@ -11,26 +11,39 @@
 	onMount(() => {
 		if (!browser || !('serviceWorker' in navigator)) return;
 
+		let swReg: ServiceWorkerRegistration | null = null;
+
+		function sendPrefs(cs: any, np: any) {
+			swReg?.active?.postMessage({ type: 'UPDATE_PREFS', commuteState: cs, notifPrefs: np });
+		}
+
 		navigator.serviceWorker.register('/sw.js').then((reg) => {
-			function sendPrefs(cs: any, np: any) {
-				reg.active?.postMessage({ type: 'UPDATE_PREFS', commuteState: cs, notifPrefs: np });
-			}
-
+			swReg = reg;
+			// Send current prefs immediately once SW is active
 			let cs: any, np: any;
-			const unsubC = commute.subscribe((s) => {
+			commute.subscribe((s) => {
 				cs = s;
-				if (np !== undefined) sendPrefs(cs, np);
-			});
-			const unsubN = notificationPrefs.subscribe((s) => {
+			})();
+			notificationPrefs.subscribe((s) => {
 				np = s;
-				if (cs !== undefined) sendPrefs(cs, np);
-			});
-
-			return () => {
-				unsubC();
-				unsubN();
-			};
+			})();
+			sendPrefs(cs, np);
 		});
+
+		let cs: any, np: any;
+		const unsubC = commute.subscribe((s) => {
+			cs = s;
+			if (swReg) sendPrefs(cs, np);
+		});
+		const unsubN = notificationPrefs.subscribe((s) => {
+			np = s;
+			if (swReg) sendPrefs(cs, np);
+		});
+
+		return () => {
+			unsubC();
+			unsubN();
+		};
 	});
 </script>
 
