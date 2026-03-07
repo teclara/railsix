@@ -60,7 +60,11 @@
 				<SplitFlapChar value={char} delay={0} />
 			{/each}
 		</span>
-		<span class="col-cars text-gray-400 text-xs">CRS</span>
+		<span class="col-cars text-gray-400">
+			{#each padRight('CRS', 3).split('') as char}
+				<SplitFlapChar value={char} delay={0} />
+			{/each}
+		</span>
 		<span class="col-platform text-white">
 			{#each padRight('PLAT', 4).split('') as char}
 				<SplitFlapChar value={char} delay={0} />
@@ -98,10 +102,10 @@
 				{/each}
 			</span>
 
-			<span class="col-cars text-gray-400 text-xs">
-				{#if dep.cars}
-					{dep.cars}c
-				{/if}
+			<span class="col-cars text-gray-400">
+				{#each padRight(dep.cars ? dep.cars + 'C' : '---', 3).split('') as char, j}
+					<SplitFlapChar value={char} delay={80 + j * 20} />
+				{/each}
 			</span>
 
 			<span class="col-platform text-white">
