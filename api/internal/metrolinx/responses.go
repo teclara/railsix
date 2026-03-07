@@ -76,12 +76,8 @@ func (c *Client) GetNextService(ctx context.Context, stopCode string) ([]models.
 }
 
 // GetUnionDepartures fetches the live Union Station departures board.
-// mode can be "All", "Train", or "Bus".
-func (c *Client) GetUnionDepartures(ctx context.Context, mode string) ([]models.UnionDeparture, error) {
-	if mode == "" {
-		mode = "All"
-	}
-	data, err := c.Fetch(ctx, "/ServiceUpdate/UnionDepartures/"+mode)
+func (c *Client) GetUnionDepartures(ctx context.Context) ([]models.UnionDeparture, error) {
+	data, err := c.Fetch(ctx, "/ServiceUpdate/UnionDepartures/All")
 	if err != nil {
 		return nil, err
 	}

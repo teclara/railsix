@@ -261,8 +261,7 @@ func (h *Handlers) UnionDepartures(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, []models.UnionDeparture{})
 		return
 	}
-	mode := r.URL.Query().Get("mode")
-	deps, err := h.mx.GetUnionDepartures(r.Context(), mode)
+	deps, err := h.mx.GetUnionDepartures(r.Context())
 	if err != nil {
 		slog.Warn("union departures fetch failed", "error", err)
 		respondJSON(w, []models.UnionDeparture{})
