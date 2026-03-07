@@ -25,6 +25,19 @@
     step = 2;
   }
 
+  $effect(() => {
+    if (workOrigin && workOriginQuery !== workOrigin.name) workOrigin = null;
+  });
+  $effect(() => {
+    if (workDest && workDestQuery !== workDest.name) workDest = null;
+  });
+  $effect(() => {
+    if (homeOrigin && homeOriginQuery !== homeOrigin.name) homeOrigin = null;
+  });
+  $effect(() => {
+    if (homeDest && homeDestQuery !== homeDest.name) homeDest = null;
+  });
+
   function save() {
     if (!workOrigin || !workDest || !homeOrigin || !homeDest) return;
     commute.setTrip('toWork', {
@@ -112,7 +125,7 @@
             ← BACK
           </button>
           <button
-            class="flex-2 bg-amber-400 text-black font-mono font-bold py-3 px-6 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+            class="flex-1 bg-amber-400 text-black font-mono font-bold py-3 px-6 rounded disabled:opacity-40 disabled:cursor-not-allowed"
             disabled={!homeOrigin || !homeDest}
             onclick={save}
           >

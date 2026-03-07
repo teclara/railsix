@@ -51,9 +51,12 @@
     autocomplete="off"
   />
   {#if showDropdown}
-    <ul class="dropdown absolute z-50 w-full mt-1 bg-[#1e1e1e] border border-[#333] rounded shadow-lg max-h-48 overflow-y-auto">
+    <ul
+      class="dropdown absolute z-50 w-full mt-1 bg-[#1e1e1e] border border-[#333] rounded shadow-lg max-h-48 overflow-y-auto"
+      role="listbox"
+    >
       {#each results as stop}
-        <li>
+        <li role="option" aria-selected="false">
           <button
             class="w-full text-left px-3 py-2 text-sm font-mono text-white hover:bg-[#2a2a2a] focus:bg-[#2a2a2a]"
             onmousedown={() => select(stop)}
