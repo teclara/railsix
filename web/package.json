@@ -32,6 +32,6 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"mapbox-gl": "^3.19.0"
+		"mapbox-gl": "^3.19.1"
 	}
 }
