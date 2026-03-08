@@ -54,6 +54,26 @@
 	<meta name="apple-mobile-web-app-title" content="Rail Six" />
 	<link rel="manifest" href="/manifest.json" />
 	<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+	<link rel="canonical" href="https://railsix.com{path}" />
+	{@html `<script type="application/ld+json">${JSON.stringify({
+		"@context": "https://schema.org",
+		"@type": "WebApplication",
+		"name": "Rail Six",
+		"url": "https://railsix.com",
+		"description": "Real-time GO Transit departure board and commute tracker. Track trains, delays, and platform info for your daily commute.",
+		"applicationCategory": "TravelApplication",
+		"operatingSystem": "Web",
+		"offers": { "@type": "Offer", "price": "0", "priceCurrency": "CAD" },
+		"author": { "@type": "Organization", "name": "Teclara Technologies Inc" }
+	})}</script>`}
+	{@html `<script type="application/ld+json">${JSON.stringify({
+		"@context": "https://schema.org",
+		"@type": "BreadcrumbList",
+		"itemListElement": [
+			{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://railsix.com/" },
+			...(path !== '/' ? [{ "@type": "ListItem", "position": 2, "name": path === '/departures' ? 'Departures' : path === '/board' ? 'Board' : path.slice(1), "item": `https://railsix.com${path}` }] : [])
+		]
+	})}</script>`}
 </svelte:head>
 
 {@render children()}

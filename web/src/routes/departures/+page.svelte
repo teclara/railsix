@@ -63,6 +63,15 @@
 		content="Look up real-time GO Transit departures from any station."
 	/>
 	<meta property="og:type" content="website" />
+	<meta property="og:url" content="https://railsix.com/departures" />
+	<meta property="og:image" content="https://railsix.com/train.png" />
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:title" content="Station Departures — Rail Six" />
+	<meta
+		name="twitter:description"
+		content="Look up real-time GO Transit departures from any station."
+	/>
+	<meta name="twitter:image" content="https://railsix.com/train.png" />
 </svelte:head>
 
 <div class="departures-page bg-[#111] min-h-screen text-white font-mono flex flex-col gap-4">
