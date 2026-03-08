@@ -115,11 +115,24 @@
 		return s.padStart(s.length + left, ' ').padEnd(len, ' ');
 	}
 
-	function occupancyLabel(pct: number | undefined): { text: string; cls: string } {
-		if (!pct) return { text: '', cls: '' };
-		if (pct <= 33) return { text: '▪', cls: 'text-green-400' };
-		if (pct <= 66) return { text: '▪▪', cls: 'text-amber-400' };
-		return { text: '▪▪▪', cls: 'text-red-400' };
+	function occupancyLabel(status: string | undefined): { text: string; cls: string } {
+		if (!status) return { text: '', cls: '' };
+		switch (status) {
+			case 'MANY_SEATS_AVAILABLE':
+				return { text: '▪ SEATS AVAIL', cls: 'text-green-400' };
+			case 'FEW_SEATS_AVAILABLE':
+				return { text: '▪▪ FEW SEATS', cls: 'text-amber-400' };
+			case 'STANDING_ROOM_ONLY':
+				return { text: '▪▪▪ STANDING', cls: 'text-amber-400' };
+			case 'CRUSHED_STANDING_ROOM_ONLY':
+				return { text: '▪▪▪ FULL', cls: 'text-red-400' };
+			case 'FULL':
+				return { text: '▪▪▪ FULL', cls: 'text-red-400' };
+			case 'NOT_ACCEPTING_PASSENGERS':
+				return { text: '✕ NOT BOARDING', cls: 'text-red-500' };
+			default:
+				return { text: '', cls: '' };
+		}
 	}
 
 	function infoClass(info: string): string {
@@ -302,7 +315,7 @@
 							<span class="text-green-400">EN ROUTE</span>
 						{/if}
 						{#if occ.text}
-							<span class={occ.cls} title="{dep.occupancy}% full">{occ.text}</span>
+							<span class={occ.cls} title={dep.occupancy}>{occ.text}</span>
 						{/if}
 						{#if dep.stops && dep.stops.length > 0}
 							<span class="stops-line text-gray-400 tracking-wide" use:marquee>
@@ -374,7 +387,7 @@
 							<span class="text-green-400">EN ROUTE</span>
 						{/if}
 						{#if occ.text}
-							<span class={occ.cls} title="{dep.occupancy}% full">{occ.text}</span>
+							<span class={occ.cls} title={dep.occupancy}>{occ.text}</span>
 						{/if}
 						{#if dep.stops.length > 0}
 							<span class="stops-line text-gray-400 tracking-wide" use:marquee>

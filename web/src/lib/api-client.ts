@@ -15,7 +15,7 @@ export type Departure = {
 	platform?: string;
 	delayMinutes?: number;
 	stops?: string[];
-	occupancy?: number;
+	occupancy?: string;
 	cars?: string;
 	isInMotion?: boolean;
 	isCancelled?: boolean;
@@ -38,7 +38,7 @@ export type UnionDeparture = {
 	info: string;
 	stops: string[];
 	cars?: string;
-	occupancy?: number;
+	occupancy?: string;
 	isInMotion?: boolean;
 	isCancelled?: boolean;
 	alert?: string;

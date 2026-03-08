@@ -36,18 +36,28 @@
 		return 'text-green-400';
 	}
 
-	function occupancyIcon(pct: number | undefined): string {
-		if (pct == null || pct === 0) return '';
-		if (pct <= 40) return '\u25CB'; // empty circle - lots of seats
-		if (pct <= 75) return '\u25D1'; // half circle - some seats
-		return '\u25CF'; // full circle - standing room
+	function occupancyIcon(status: string | undefined): string {
+		if (!status) return '';
+		switch (status) {
+			case 'MANY_SEATS_AVAILABLE': return '\u25CB';
+			case 'FEW_SEATS_AVAILABLE': return '\u25D1';
+			case 'STANDING_ROOM_ONLY':
+			case 'CRUSHED_STANDING_ROOM_ONLY':
+			case 'FULL': return '\u25CF';
+			default: return '';
+		}
 	}
 
-	function occupancyClass(pct: number | undefined): string {
-		if (pct == null || pct === 0) return '';
-		if (pct <= 40) return 'text-green-400';
-		if (pct <= 75) return 'text-amber-400';
-		return 'text-red-400';
+	function occupancyClass(status: string | undefined): string {
+		if (!status) return '';
+		switch (status) {
+			case 'MANY_SEATS_AVAILABLE': return 'text-green-400';
+			case 'FEW_SEATS_AVAILABLE': return 'text-amber-400';
+			case 'STANDING_ROOM_ONLY':
+			case 'CRUSHED_STANDING_ROOM_ONLY':
+			case 'FULL': return 'text-red-400';
+			default: return '';
+		}
 	}
 
 	let rows = $derived(departures.slice(0, maxRows));
@@ -128,7 +138,7 @@
 
 			<span
 				class="col-occ {occupancyClass(dep.occupancy)}"
-				title={dep.occupancy ? `${dep.occupancy}% full` : ''}
+				title={dep.occupancy ?? ''}
 			>
 				{occupancyIcon(dep.occupancy)}
 			</span>

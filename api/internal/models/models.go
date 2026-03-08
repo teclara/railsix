@@ -29,7 +29,7 @@ type Departure struct {
 	RouteColor    string   `json:"routeColor,omitempty"`
 	DelayMinutes  int      `json:"delayMinutes,omitempty"`
 	Stops         []string `json:"stops,omitempty"`
-	Occupancy     int      `json:"occupancy,omitempty"`     // 0-100 percentage
+	Occupancy     string   `json:"occupancy,omitempty"`     // GTFS-RT occupancy status
 	Cars          string   `json:"cars,omitempty"`           // number of coaches
 	IsInMotion    bool     `json:"isInMotion,omitempty"`
 	IsCancelled   bool     `json:"isCancelled,omitempty"`

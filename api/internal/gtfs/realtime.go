@@ -33,9 +33,15 @@ type gtfsRTFeed struct {
 }
 
 type gtfsRTEntity struct {
-	ID         string         `json:"id"`
-	Alert      *gtfsRTAlert   `json:"alert"`
-	TripUpdate *gtfsRTTripUpd `json:"trip_update"`
+	ID         string           `json:"id"`
+	Alert      *gtfsRTAlert     `json:"alert"`
+	TripUpdate *gtfsRTTripUpd   `json:"trip_update"`
+	Vehicle    *gtfsRTVehicle   `json:"vehicle"`
+}
+
+type gtfsRTVehicle struct {
+	Trip            gtfsRTTrip `json:"trip"`
+	OccupancyStatus string     `json:"occupancy_status"`
 }
 
 type gtfsRTTrip struct {
@@ -139,17 +145,19 @@ type RealtimeCache struct {
 	serviceGlance    map[string]models.ServiceGlanceEntry // keyed by trip number
 	cancelledTrips   map[string]bool                       // set of cancelled trip numbers
 	unionDepartures  []models.UnionDeparture
+	occupancyStatus  map[string]string                              // keyed by trip ID → GTFS-RT occupancy_status
 	nextService      map[string]ttlEntry[[]models.NextServiceLine] // keyed by stopCode, 30s TTL
 	fares            map[string]ttlEntry[[]models.FareInfo]         // keyed by "from|to", 1h TTL
 }
 
 func NewRealtimeCache() *RealtimeCache {
 	return &RealtimeCache{
-		tripUpdates:    make(map[string]RawTripUpdate),
-		serviceGlance:  make(map[string]models.ServiceGlanceEntry),
-		cancelledTrips: make(map[string]bool),
-		nextService:    make(map[string]ttlEntry[[]models.NextServiceLine]),
-		fares:          make(map[string]ttlEntry[[]models.FareInfo]),
+		tripUpdates:     make(map[string]RawTripUpdate),
+		serviceGlance:   make(map[string]models.ServiceGlanceEntry),
+		cancelledTrips:  make(map[string]bool),
+		occupancyStatus: make(map[string]string),
+		nextService:     make(map[string]ttlEntry[[]models.NextServiceLine]),
+		fares:           make(map[string]ttlEntry[[]models.FareInfo]),
 	}
 }
 
@@ -203,6 +211,32 @@ func (rc *RealtimeCache) GetAllServiceGlance() map[string]models.ServiceGlanceEn
 		out[k] = v
 	}
 	return out
+}
+
+func (rc *RealtimeCache) SetOccupancyStatus(m map[string]string) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.occupancyStatus = m
+}
+
+// GetOccupancyStatus returns the GTFS-RT occupancy status for a trip ID.
+func (rc *RealtimeCache) GetOccupancyStatus(tripID string) string {
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
+	return rc.occupancyStatus[tripID]
+}
+
+// GetOccupancyByTripNumber finds occupancy by matching the trip number suffix in trip IDs.
+func (rc *RealtimeCache) GetOccupancyByTripNumber(tripNumber string) string {
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
+	suffix := "-" + tripNumber
+	for id, status := range rc.occupancyStatus {
+		if len(id) > len(suffix) && id[len(id)-len(suffix):] == suffix {
+			return status
+		}
+	}
+	return ""
 }
 
 func (rc *RealtimeCache) SetCancelledTrips(cancelled map[string]bool) {
@@ -574,4 +608,48 @@ func fetchAndCacheUnionDepartures(ctx context.Context, fetcher UnionDeparturesFe
 	}
 	cache.SetUnionDepartures(deps)
 	slog.Info("union departures updated", "count", len(deps))
+}
+
+// StartOccupancyPoller polls GTFS-RT VehiclePosition for occupancy status.
+func StartOccupancyPoller(ctx context.Context, fetcher Fetcher, cache *RealtimeCache, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		fetchAndCacheOccupancy(ctx, fetcher, cache)
+		for {
+			select {
+			case <-ctx.Done():
+				slog.Info("occupancy poller stopped")
+				return
+			case <-ticker.C:
+				fetchAndCacheOccupancy(ctx, fetcher, cache)
+			}
+		}
+	}()
+}
+
+func fetchAndCacheOccupancy(ctx context.Context, fetcher Fetcher, cache *RealtimeCache) {
+	data, err := fetcher.Fetch(ctx, "/Gtfs/Feed/VehiclePosition.json")
+	if err != nil {
+		slog.Error("fetching vehicle positions for occupancy", "error", err)
+		return
+	}
+	var feed gtfsRTFeed
+	if err := json.Unmarshal(data, &feed); err != nil {
+		slog.Error("parsing vehicle positions", "error", err)
+		return
+	}
+	m := make(map[string]string, len(feed.Entity))
+	for _, e := range feed.Entity {
+		if e.Vehicle == nil {
+			continue
+		}
+		status := e.Vehicle.OccupancyStatus
+		if status == "" || status == "EMPTY" {
+			continue // skip empty/unknown to save memory
+		}
+		m[e.Vehicle.Trip.TripID] = status
+	}
+	cache.SetOccupancyStatus(m)
+	slog.Info("occupancy status updated", "withData", len(m), "total", len(feed.Entity))
 }

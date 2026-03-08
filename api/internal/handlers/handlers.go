@@ -74,7 +74,7 @@ type departureResponse struct {
 	Platform      string   `json:"platform,omitempty"`
 	DelayMinutes  int      `json:"delayMinutes,omitempty"`
 	Stops         []string `json:"stops,omitempty"`
-	Occupancy     int      `json:"occupancy,omitempty"`
+	Occupancy     string   `json:"occupancy,omitempty"`
 	Cars          string   `json:"cars,omitempty"`
 	IsInMotion    bool     `json:"isInMotion,omitempty"`
 	IsCancelled   bool     `json:"isCancelled,omitempty"`
@@ -88,7 +88,7 @@ type unionDepartureResponse struct {
 	Info        string   `json:"info"`
 	Stops       []string `json:"stops"`
 	Cars        string   `json:"cars,omitempty"`
-	Occupancy   int      `json:"occupancy,omitempty"`
+	Occupancy   string   `json:"occupancy,omitempty"`
 	IsInMotion  bool     `json:"isInMotion,omitempty"`
 	IsCancelled bool     `json:"isCancelled,omitempty"`
 	Alert       string   `json:"alert,omitempty"`
@@ -325,8 +325,10 @@ func (h *Handlers) UnionDepartures(w http.ResponseWriter, r *http.Request) {
 		}
 		if sg, ok := h.rt.GetServiceGlanceEntry(d.TripNumber); ok {
 			slim[i].Cars = sg.Cars
-			slim[i].Occupancy = sg.Occupancy
 			slim[i].IsInMotion = sg.IsInMotion
+		}
+		if occ := h.rt.GetOccupancyByTripNumber(d.TripNumber); occ != "" {
+			slim[i].Occupancy = occ
 		}
 		if h.rt.IsTripCancelled(d.TripNumber) {
 			slim[i].IsCancelled = true
