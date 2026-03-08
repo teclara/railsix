@@ -84,6 +84,7 @@ type unionDepartureResponse struct {
 	Time     string   `json:"time"`
 	Info     string   `json:"info"`
 	Stops    []string `json:"stops"`
+	Cars     string   `json:"cars,omitempty"`
 }
 
 type fareResponse struct {
@@ -293,6 +294,9 @@ func (h *Handlers) UnionDepartures(w http.ResponseWriter, r *http.Request) {
 			Time:     d.Time,
 			Info:     d.Info,
 			Stops:    d.Stops,
+		}
+		if sg, ok := h.rt.GetServiceGlanceEntry(d.TripNumber); ok {
+			slim[i].Cars = sg.Cars
 		}
 	}
 	respondJSON(w, slim)
