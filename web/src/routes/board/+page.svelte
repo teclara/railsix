@@ -117,6 +117,13 @@
 		return s.padStart(s.length + left, ' ').padEnd(len, ' ');
 	}
 
+	function occupancyLabel(pct: number | undefined): { text: string; cls: string } {
+		if (!pct) return { text: '', cls: '' };
+		if (pct <= 33) return { text: '▪', cls: 'text-green-400' };
+		if (pct <= 66) return { text: '▪▪', cls: 'text-amber-400' };
+		return { text: '▪▪▪', cls: 'text-red-400' };
+	}
+
 	function infoClass(info: string): string {
 		if (info.includes('PROCEED')) return 'text-green-400';
 		if (info.includes('WAIT')) return 'text-amber-400';
@@ -248,36 +255,17 @@
 	{#if selectedStation}
 		<!-- Station departures view -->
 		<div class="col-headers flap-row-station">
-			<span class="col-time text-amber-400">
-				{#each padRight('TIME', 5).split('') as char}
-					<SplitFlapChar value={char} delay={0} />
-				{/each}
-			</span>
-			<span class="col-line text-white">
-				{#each padRight('LINE', 14).split('') as char}
-					<SplitFlapChar value={char} delay={0} />
-				{/each}
-			</span>
-			<span class="col-cars text-gray-400">
-				{#each padCenter('CRS', 3).split('') as char}
-					<SplitFlapChar value={char} delay={0} />
-				{/each}
-			</span>
-			<span class="col-plat text-white">
-				{#each padCenter('PLATFRM', 7).split('') as char}
-					<SplitFlapChar value={char} delay={0} />
-				{/each}
-			</span>
-			<span class="col-status text-gray-400">
-				{#each padRight('STATUS', 7).split('') as char}
-					<SplitFlapChar value={char} delay={0} />
-				{/each}
-			</span>
+			<span class="col-time text-amber-400">TIME</span>
+			<span class="col-line text-white">LINE</span>
+			<span class="col-cars text-gray-400">CRS</span>
+			<span class="col-plat text-white">PLATFRM</span>
+			<span class="col-status text-gray-400">STATUS</span>
 		</div>
 
 		<div class="rows">
 			{#each stationDepartures as dep, i}
-				<div class="departure-row" class:first={i === 0}>
+				{@const occ = occupancyLabel(dep.occupancy)}
+				<div class="departure-row" class:cancelled={dep.isCancelled}>
 					<div class="flap-row-station">
 						<span class="col-time text-amber-400">
 							{#each padRight(dep.scheduledTime.slice(0, 5), 5).split('') as char, j}
@@ -286,7 +274,8 @@
 						</span>
 
 						<span class="col-line text-white">
-							{#each padRight(dep.lineName || dep.line, 14).split('') as char, j}
+							{#if dep.hasAlert}<span class="text-amber-400" title="Service alert">!</span>{/if}
+							{#each padRight(dep.lineName || dep.line, dep.hasAlert ? 13 : 14).split('') as char, j}
 								<SplitFlapChar value={char} delay={20 + j * 10} />
 							{/each}
 						</span>
@@ -310,11 +299,19 @@
 						</span>
 					</div>
 
-					{#if dep.stops && dep.stops.length > 0}
-						<div class="stops-line text-gray-400 tracking-wide" use:marquee>
-							<span class="stops-scroll">{dep.stops.join(' · ')}</span>
-						</div>
-					{/if}
+					<div class="meta-line">
+						{#if dep.isInMotion}
+							<span class="text-green-400">EN ROUTE</span>
+						{/if}
+						{#if occ.text}
+							<span class={occ.cls} title="{dep.occupancy}% full">{occ.text}</span>
+						{/if}
+						{#if dep.stops && dep.stops.length > 0}
+							<span class="stops-line text-gray-400 tracking-wide" use:marquee>
+								<span class="stops-scroll">{dep.stops.join(' · ')}</span>
+							</span>
+						{/if}
+					</div>
 				</div>
 			{/each}
 
@@ -327,31 +324,17 @@
 	{:else}
 		<!-- Union Station departures view -->
 		<div class="col-headers flap-row">
-			<span class="col-time text-amber-400">
-				{#each padRight('TIME', 5).split('') as char}
-					<SplitFlapChar value={char} delay={0} />
-				{/each}
-			</span>
-			<span class="col-service text-white">
-				{#each padRight('SERVICE', 16).split('') as char}
-					<SplitFlapChar value={char} delay={0} />
-				{/each}
-			</span>
-			<span class="col-plat text-white">
-				{#each padCenter('PLATFRM', 7).split('') as char}
-					<SplitFlapChar value={char} delay={0} />
-				{/each}
-			</span>
-			<span class="col-info text-gray-400">
-				{#each padRight('STATUS', 7).split('') as char}
-					<SplitFlapChar value={char} delay={0} />
-				{/each}
-			</span>
+			<span class="col-time text-amber-400">TIME</span>
+			<span class="col-service text-white">SERVICE</span>
+			<span class="col-cars text-gray-400">CRS</span>
+			<span class="col-plat text-white">PLATFRM</span>
+			<span class="col-info text-gray-400">STATUS</span>
 		</div>
 
 		<div class="rows">
 			{#each departures as dep, i}
-				<div class="departure-row" class:first={i === 0}>
+				{@const occ = occupancyLabel(dep.occupancy)}
+				<div class="departure-row" class:cancelled={dep.isCancelled}>
 					<div class="flap-row">
 						<span class="col-time text-amber-400">
 							{#each padRight(dep.time, 5).split('') as char, j}
@@ -360,8 +343,15 @@
 						</span>
 
 						<span class="col-service text-white">
-							{#each padRight(dep.service, 16).split('') as char, j}
+							{#if dep.hasAlert}<span class="text-amber-400" title="Service alert">!</span>{/if}
+							{#each padRight(dep.service, dep.hasAlert ? 15 : 16).split('') as char, j}
 								<SplitFlapChar value={char} delay={20 + j * 10} />
+							{/each}
+						</span>
+
+						<span class="col-cars text-gray-400">
+							{#each padRight(dep.cars ? dep.cars + 'C' : '---', 3).split('') as char, j}
+								<SplitFlapChar value={char} delay={40 + j * 15} />
 							{/each}
 						</span>
 
@@ -372,17 +362,25 @@
 						</span>
 
 						<span class="col-info {infoClass(dep.info)}">
-							{#each padRight(dep.info, 7).split('') as char, j}
+							{#each padRight(dep.isCancelled ? 'CANCEL' : dep.info, 7).split('') as char, j}
 								<SplitFlapChar value={char} delay={60 + j * 10} />
 							{/each}
 						</span>
 					</div>
 
-					{#if dep.stops.length > 0}
-						<div class="stops-line text-gray-400 tracking-wide" use:marquee>
-							<span class="stops-scroll">{dep.stops.join(' · ')}</span>
-						</div>
-					{/if}
+					<div class="meta-line">
+						{#if dep.isInMotion}
+							<span class="text-green-400">EN ROUTE</span>
+						{/if}
+						{#if occ.text}
+							<span class={occ.cls} title="{dep.occupancy}% full">{occ.text}</span>
+						{/if}
+						{#if dep.stops.length > 0}
+							<span class="stops-line text-gray-400 tracking-wide" use:marquee>
+								<span class="stops-scroll">{dep.stops.join(' · ')}</span>
+							</span>
+						{/if}
+					</div>
 				</div>
 			{/each}
 
@@ -419,6 +417,8 @@
 		padding: 0.3em 0.8em;
 		border-bottom: 1px solid #161616;
 		flex-shrink: 0;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
 	}
 
 	.rows {
@@ -428,7 +428,7 @@
 
 	.flap-row {
 		display: grid;
-		grid-template-columns: 5ch 1fr 7ch 7ch;
+		grid-template-columns: 5ch 1fr 3ch 7ch 7ch;
 		gap: 0.4em;
 		align-items: center;
 	}
@@ -471,12 +471,24 @@
 	}
 
 	.departure-row {
-		border-bottom: 1px solid #161616;
 		padding: 0.6em 0;
 	}
 
-	.departure-row.first {
-		border-bottom-color: #222;
+	.departure-row.cancelled .col-time,
+	.departure-row.cancelled .col-service,
+	.departure-row.cancelled .col-line,
+	.departure-row.cancelled .col-plat,
+	.departure-row.cancelled .col-cars {
+		text-decoration: line-through;
+		opacity: 0.4;
+	}
+
+	.meta-line {
+		display: flex;
+		align-items: center;
+		gap: 0.6em;
+		margin-top: 0.15em;
+		font-size: 0.55em;
 	}
 
 	.stops-line {
@@ -590,7 +602,7 @@
 		}
 
 		.flap-row {
-			grid-template-columns: 5ch 1fr 5ch 7ch;
+			grid-template-columns: 5ch 1fr 3ch 5ch 7ch;
 			gap: 0.3em;
 		}
 		.flap-row-station {

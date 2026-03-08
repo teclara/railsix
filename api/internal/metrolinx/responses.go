@@ -175,6 +175,9 @@ func (c *Client) GetServiceGlance(ctx context.Context) ([]models.ServiceGlanceEn
 			LineName:   strings.TrimSpace(t.Display),
 			Cars:       t.Cars,
 			Occupancy:  t.OccupancyPercentage,
+			Lat:        t.Latitude,
+			Lon:        t.Longitude,
+			IsInMotion: t.IsInMotion,
 		})
 	}
 	return entries, nil

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	gtfsstore "github.com/teclara/sixrail/api/internal/gtfs"
@@ -75,22 +76,40 @@ type departureResponse struct {
 	Stops         []string `json:"stops,omitempty"`
 	Occupancy     int      `json:"occupancy,omitempty"`
 	Cars          string   `json:"cars,omitempty"`
+	IsInMotion    bool     `json:"isInMotion,omitempty"`
 	IsCancelled   bool     `json:"isCancelled,omitempty"`
+	HasAlert      bool     `json:"hasAlert,omitempty"`
 }
 
 type unionDepartureResponse struct {
-	Service  string   `json:"service"`
-	Platform string   `json:"platform"`
-	Time     string   `json:"time"`
-	Info     string   `json:"info"`
-	Stops    []string `json:"stops"`
-	Cars     string   `json:"cars,omitempty"`
+	Service     string   `json:"service"`
+	Platform    string   `json:"platform"`
+	Time        string   `json:"time"`
+	Info        string   `json:"info"`
+	Stops       []string `json:"stops"`
+	Cars        string   `json:"cars,omitempty"`
+	Occupancy   int      `json:"occupancy,omitempty"`
+	IsInMotion  bool     `json:"isInMotion,omitempty"`
+	IsCancelled bool     `json:"isCancelled,omitempty"`
+	HasAlert    bool     `json:"hasAlert,omitempty"`
 }
 
 type fareResponse struct {
 	Category string  `json:"category"`
 	FareType string  `json:"fareType"`
 	Amount   float64 `json:"amount"`
+}
+
+// routesWithAlerts returns a set of uppercased route names that have active alerts.
+func (h *Handlers) routesWithAlerts() map[string]bool {
+	alerts := h.rt.GetAlerts()
+	set := make(map[string]bool)
+	for _, a := range alerts {
+		for _, name := range a.RouteNames {
+			set[strings.ToUpper(name)] = true
+		}
+	}
+	return set
 }
 
 // AllStops serves stops from GTFS static data (slim: no lat/lon/parentId).
@@ -169,6 +188,7 @@ func (h *Handlers) StopDepartures(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return slim response (no destination, routeColor).
+	alertRoutes := h.routesWithAlerts()
 	slim := make([]departureResponse, len(departures))
 	for i, d := range departures {
 		slim[i] = departureResponse{
@@ -182,7 +202,9 @@ func (h *Handlers) StopDepartures(w http.ResponseWriter, r *http.Request) {
 			Stops:         d.Stops,
 			Occupancy:     d.Occupancy,
 			Cars:          d.Cars,
+			IsInMotion:    d.IsInMotion,
 			IsCancelled:   d.IsCancelled,
+			HasAlert:      alertRoutes[strings.ToUpper(d.LineName)],
 		}
 	}
 	respondJSON(w, slim)
@@ -286,17 +308,25 @@ func (h *Handlers) UnionDepartures(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, []unionDepartureResponse{})
 		return
 	}
+	alertRoutes := h.routesWithAlerts()
 	slim := make([]unionDepartureResponse, len(deps))
 	for i, d := range deps {
 		slim[i] = unionDepartureResponse{
-			Service:  d.Service,
-			Platform: d.Platform,
-			Time:     d.Time,
-			Info:     d.Info,
-			Stops:    d.Stops,
+			Service:     d.Service,
+			Platform:    d.Platform,
+			Time:        d.Time,
+			Info:        d.Info,
+			Stops:       d.Stops,
+			IsCancelled: strings.Contains(strings.ToUpper(d.Info), "CANCEL"),
+			HasAlert:    alertRoutes[strings.ToUpper(d.Service)],
 		}
 		if sg, ok := h.rt.GetServiceGlanceEntry(d.TripNumber); ok {
 			slim[i].Cars = sg.Cars
+			slim[i].Occupancy = sg.Occupancy
+			slim[i].IsInMotion = sg.IsInMotion
+		}
+		if h.rt.IsTripCancelled(d.TripNumber) {
+			slim[i].IsCancelled = true
 		}
 	}
 	respondJSON(w, slim)

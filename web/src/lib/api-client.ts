@@ -17,7 +17,9 @@ export type Departure = {
 	stops?: string[];
 	occupancy?: number;
 	cars?: string;
+	isInMotion?: boolean;
 	isCancelled?: boolean;
+	hasAlert?: boolean;
 };
 
 export async function fetchDepartures(stopCode: string, destCode?: string): Promise<Departure[]> {
@@ -35,6 +37,11 @@ export type UnionDeparture = {
 	time: string;
 	info: string;
 	stops: string[];
+	cars?: string;
+	occupancy?: number;
+	isInMotion?: boolean;
+	isCancelled?: boolean;
+	hasAlert?: boolean;
 };
 
 export async function fetchUnionDepartures(): Promise<UnionDeparture[]> {

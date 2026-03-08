@@ -143,6 +143,7 @@ func GetDepartures(stopCode, destCode string, now time.Time, static *StaticStore
 		if sg, ok := rt.GetServiceGlanceEntry(tripNumber); ok {
 			dep.Occupancy = sg.Occupancy
 			dep.Cars = sg.Cars
+			dep.IsInMotion = sg.IsInMotion
 		}
 
 		// Flag cancelled trips from exceptions cache.

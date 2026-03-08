@@ -31,6 +31,7 @@ type Departure struct {
 	Stops         []string `json:"stops,omitempty"`
 	Occupancy     int      `json:"occupancy,omitempty"`     // 0-100 percentage
 	Cars          string   `json:"cars,omitempty"`           // number of coaches
+	IsInMotion    bool     `json:"isInMotion,omitempty"`
 	IsCancelled   bool     `json:"isCancelled,omitempty"`
 }
 
@@ -79,6 +80,9 @@ type ServiceGlanceEntry struct {
 	LineName   string // Display field
 	Cars       string
 	Occupancy  int
+	Lat        float64
+	Lon        float64
+	IsInMotion bool
 }
 
 type Alert struct {
