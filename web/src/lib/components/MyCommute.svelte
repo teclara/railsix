@@ -115,7 +115,7 @@
 	<CommuteSetup {stops} />
 {:else}
 	<div
-		class="dashboard bg-[#111] min-h-screen text-white font-mono p-4 flex flex-col gap-4 max-w-lg mx-auto"
+		class="my-commute bg-[#111] min-h-screen text-white font-mono p-4 flex flex-col gap-4 max-w-lg mx-auto"
 	>
 		<!-- Header -->
 		<div class="flex items-start justify-between pt-2">
@@ -205,6 +205,7 @@
 				>
 			</div>
 		{/if}
+
 	</div>
 
 	{#if showSettings}

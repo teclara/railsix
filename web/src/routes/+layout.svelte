@@ -61,7 +61,7 @@
 <nav class="bottom-nav" aria-label="Main navigation">
 	<a href="/" class="nav-item" class:active={path === '/'}>
 		<span class="icon">⊟</span>
-		<span class="label">Dashboard</span>
+		<span class="label">My Commute</span>
 	</a>
 	<a href="/board" class="nav-item" class:active={path === '/board'}>
 		<span class="icon">▤</span>
