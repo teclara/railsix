@@ -1,6 +1,6 @@
 {
-	"name": "Six Rail",
-	"short_name": "Six Rail",
+	"name": "Rail Six",
+	"short_name": "Rail Six",
 	"description": "GO Transit real-time commuter tracker — free, no ads",
 	"start_url": "/",
 	"display": "standalone",

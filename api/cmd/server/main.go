@@ -84,7 +84,7 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
-	slog.Info("starting sixrail-api", "port", cfg.Port)
+	slog.Info("starting railsix-api", "port", cfg.Port)
 	if err := srv.ListenAndServe(); err != nil {
 		slog.Error("server failed", "error", err)
 		os.Exit(1)

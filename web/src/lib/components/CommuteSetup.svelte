@@ -62,7 +62,7 @@
 		<h1
 			class="text-amber-400 text-xl font-bold font-mono tracking-widest uppercase text-center mb-2"
 		>
-			Six Rail
+			Rail Six
 		</h1>
 		<p class="text-gray-400 text-sm font-mono text-center mb-8">Set up your commute</p>
 

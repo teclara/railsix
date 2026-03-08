@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Six Rail — GO Transit real-time tracking. Two views: commute dashboard with countdown timer and network health, and a standalone split-flap departure board.
+Rail Six — GO Transit real-time tracking. Two views: commute dashboard with countdown timer and network health, and a standalone split-flap departure board.
 
 ## Architecture
 
@@ -125,6 +125,6 @@ Key components:
 Railway with Railpack builder. Each service has its own `railway.toml` and watches only its directory.
 - API: builds Go binary named `out`, health check at `/api/health`
 - Web: `node build/index.js` (Node adapter), health check at `/`
-- Internal networking: web connects to API via `http://sixrail-api.railway.internal:8080` (must include protocol + port)
+- Internal networking: web connects to API via `http://railsix-api.railway.internal:8080` (must include protocol + port)
 
 CI: GitHub Actions in `.github/workflows/` — `api.yml` (Go test+vet) and `web.yml` (check+lint+build), triggered by path-filtered pushes/PRs.

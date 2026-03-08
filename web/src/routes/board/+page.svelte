@@ -236,7 +236,7 @@
 </script>
 
 <svelte:head>
-	<title>{selectedStopName || 'Union Station'} — Six Rail</title>
+	<title>{selectedStopName || 'Union Station'} — Rail Six</title>
 </svelte:head>
 
 <div class="board font-mono select-none bg-[#0a0a0a] text-white" bind:this={boardEl}>

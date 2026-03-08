@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sixrail-v2';
+const CACHE_NAME = 'railsix-v1';
 const STATIC_ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -70,7 +70,7 @@ async function checkDepartures() {
 			delay > lastDelayMinutes &&
 			delay >= notifPrefs.thresholdMinutes
 		) {
-			self.registration.showNotification('Six Rail — Delay Alert', {
+			self.registration.showNotification('Rail Six — Delay Alert', {
 				body: `Your ${next.scheduledTime} ${next.line} is now delayed ${delay} min`,
 				icon: '/icons/icon-192.png',
 				badge: '/icons/icon-192.png',

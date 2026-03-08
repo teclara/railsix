@@ -1,6 +1,6 @@
-# Six Rail
+# Rail Six
 
-Real-time GO Transit tracking on a fullscreen interactive map. See live train and bus positions, search stations, check upcoming departures, and view service alerts — all in one place.
+Real-time GO Transit tracking. Commute dashboard with countdown timer and network health, and a standalone split-flap departure board.
 
 ## Features
 

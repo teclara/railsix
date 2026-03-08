@@ -116,7 +116,7 @@
 		<!-- Header -->
 		<div class="flex items-start justify-between pt-2">
 			<div>
-				<h1 class="text-amber-400 font-bold text-base uppercase tracking-widest">Six Rail</h1>
+				<h1 class="text-amber-400 font-bold text-base uppercase tracking-widest">Rail Six</h1>
 				<p class="text-gray-500 text-xs mt-0.5">{greeting()} &middot; {dateStr()}</p>
 			</div>
 			<button

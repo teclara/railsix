@@ -52,12 +52,12 @@
 </script>
 
 <svelte:head>
-	<title>{selectedStop?.name ?? 'Station Lookup'} — Six Rail</title>
+	<title>{selectedStop?.name ?? 'Station Lookup'} — Rail Six</title>
 	<meta
 		name="description"
 		content="Look up real-time GO Transit departures from any station. View train times, platforms, delays, and service status."
 	/>
-	<meta property="og:title" content="Station Departures — Six Rail" />
+	<meta property="og:title" content="Station Departures — Rail Six" />
 	<meta
 		property="og:description"
 		content="Look up real-time GO Transit departures from any station."
