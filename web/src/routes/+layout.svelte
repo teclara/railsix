@@ -59,11 +59,11 @@
 {@render children()}
 
 <nav class="bottom-nav" aria-label="Main navigation">
-	<a href="/" class="nav-item" class:active={path === '/'}>
+	<a href="/" class="nav-item" class:active={path === '/'} data-sveltekit-reload>
 		<span class="icon">⊟</span>
 		<span class="label">My Commute</span>
 	</a>
-	<a href="/board" class="nav-item" class:active={path === '/board'}>
+	<a href="/board" class="nav-item" class:active={path === '/board'} data-sveltekit-reload>
 		<span class="icon">▤</span>
 		<span class="label">Board</span>
 	</a>

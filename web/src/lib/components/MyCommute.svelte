@@ -26,7 +26,6 @@
 	let departures = $state<Departure[]>([]);
 	let alerts = $state<Alert[]>(untrack(() => initialAlerts));
 	let showSettings = $state(false);
-	let loading = $state(false);
 
 	function greeting(): string {
 		const h = new Date().getHours();
@@ -50,13 +49,10 @@
 			departures = [];
 			return;
 		}
-		loading = true;
 		try {
 			departures = await fetchDepartures(activeTrip.originCode, activeTrip.destinationCode);
 		} catch {
 			departures = [];
-		} finally {
-			loading = false;
 		}
 	}
 
@@ -115,7 +111,7 @@
 	<CommuteSetup {stops} />
 {:else}
 	<div
-		class="my-commute bg-[#111] min-h-screen text-white font-mono p-4 flex flex-col gap-4 max-w-lg mx-auto"
+		class="my-commute bg-[#111] min-h-screen text-white font-mono p-4 flex flex-col justify-center gap-4 max-w-lg mx-auto"
 	>
 		<!-- Header -->
 		<div class="flex items-start justify-between pt-2">
@@ -164,27 +160,23 @@
 					{activeTrip.originName} → {activeTrip.destinationName}
 				</p>
 			</div>
+		{/if}
 
-			<!-- Alert banner -->
-			<AlertBanner {alerts} routeNames={activeRouteNames} />
+		<!-- Alert banner -->
+		<AlertBanner {alerts} routeNames={activeRouteNames} />
 
-			<!-- Split-flap board -->
-			{#if loading && departures.length === 0}
-				<div class="text-center text-gray-600 text-xs py-12 font-mono animate-pulse">
-					LOADING DEPARTURES...
-				</div>
-			{:else}
-				<SplitFlapBoard {departures} maxRows={3} />
-			{/if}
+		<!-- Split-flap board -->
+		<SplitFlapBoard {departures} maxRows={3} />
 
-			<!-- Countdown -->
-			{#if nextDeparture}
-				<div class="flex justify-center mt-2">
-					<CountdownTimer scheduledTime={nextDeparture.scheduledTime} />
-				</div>
-			{/if}
+		<!-- Countdown -->
+		{#if nextDeparture}
+			<div class="flex justify-center mt-2">
+				<CountdownTimer scheduledTime={nextDeparture.scheduledTime} />
+			</div>
+		{/if}
 
-			<!-- Notification toggle -->
+		<!-- Notification toggle -->
+		{#if activeTrip}
 			<div class="flex items-center justify-center mt-2">
 				{#if notifEnabled}
 					<p class="text-green-500 text-xs font-mono">🔔 Delay notifications on</p>
@@ -206,17 +198,23 @@
 			</div>
 		{/if}
 
-		<footer class="mt-auto pt-6 pb-4 text-center">
-			<p class="text-gray-700 text-[9px] font-mono leading-relaxed">
-				Not affiliated with Metrolinx or GO Transit. Schedule data may be inaccurate or delayed.
+		<footer class="pt-2 pb-4 text-center max-w-xs mx-auto">
+			<p class="text-gray-500 text-[11px] font-mono leading-relaxed">
+				Real-time GO Transit tracking with live departures, delay alerts, and countdown timers for your daily commute.
 			</p>
-			<p class="text-gray-600 text-[10px] tracking-wide font-mono mt-2">
+			<p class="text-gray-600 text-[10px] font-mono mt-3 leading-relaxed text-left">
+				View live departure times, platform info, and delay notifications for your saved commute. Visit the <a href="/board" class="text-amber-400 hover:text-amber-300 transition-colors">departure board</a> for a full split-flap display of upcoming trains at any station.
+			</p>
+			<p class="text-gray-700 text-[9px] font-mono mt-3 leading-relaxed">
+				Not affiliated with Metrolinx or GO Transit. Schedule data may be inaccurate or delayed. Always confirm with official sources before travelling.
+			</p>
+			<p class="text-gray-600 text-[10px] tracking-wide font-mono mt-3">
 				&copy; {new Date().getFullYear()}
 				<a
-					href="https://teclara.tech"
+					href="https://wadhah.com"
 					target="_blank"
 					rel="noopener noreferrer"
-					class="hover:text-gray-400 transition-colors">Teclara Technologies Inc</a
+					class="hover:text-gray-400 transition-colors">Wadhah Hussain</a
 				>
 			</p>
 		</footer>

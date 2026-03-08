@@ -160,7 +160,7 @@
 		</p>
 		<p class="text-gray-600 text-[10px] tracking-wide font-mono mt-3">
 			&copy; {new Date().getFullYear()}
-			<a href="https://teclara.tech" target="_blank" rel="noopener noreferrer" class="hover:text-gray-400 transition-colors">Teclara Technologies Inc</a>
+			<a href="https://wadhah.com" target="_blank" rel="noopener noreferrer" class="hover:text-gray-400 transition-colors">Wadhah Hussain</a>
 		</p>
 	</footer>
 </div>
