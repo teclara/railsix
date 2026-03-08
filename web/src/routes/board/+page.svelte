@@ -239,9 +239,13 @@
 	<title>{selectedStopName || 'Union Station'} GO Departures — Rail Six</title>
 	<meta
 		name="description"
-		content="Live GO Transit departure board — real-time train times, platforms, and delays from {selectedStopName || 'Union Station'} and all GO stations."
+		content="Live GO Transit departure board — real-time train times, platforms, and delays from {selectedStopName ||
+			'Union Station'} and all GO stations."
 	/>
-	<meta property="og:title" content="{selectedStopName || 'Union Station'} GO Departures — Rail Six" />
+	<meta
+		property="og:title"
+		content="{selectedStopName || 'Union Station'} GO Departures — Rail Six"
+	/>
 	<meta
 		property="og:description"
 		content="Live GO Transit departure board with real-time train times, platforms, and delays."
@@ -250,7 +254,10 @@
 	<meta property="og:url" content="https://railsix.com/board" />
 	<meta property="og:image" content="https://railsix.com/train.png" />
 	<meta name="twitter:card" content="summary" />
-	<meta name="twitter:title" content="{selectedStopName || 'Union Station'} GO Departures — Rail Six" />
+	<meta
+		name="twitter:title"
+		content="{selectedStopName || 'Union Station'} GO Departures — Rail Six"
+	/>
 	<meta
 		name="twitter:description"
 		content="Live GO Transit departure board with real-time train times, platforms, and delays."
