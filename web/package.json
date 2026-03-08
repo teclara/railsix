@@ -34,8 +34,5 @@
 	"type": "module",
 	"dependencies": {
 		"mapbox-gl": "^3.19.1"
-	},
-	"overrides": {
-		"cookie": "^0.7.2"
 	}
 }
