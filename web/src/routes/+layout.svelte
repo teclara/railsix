@@ -63,6 +63,15 @@
 		<span class="icon">⊟</span>
 		<span class="label">My Commute</span>
 	</a>
+	<a
+		href="/departures"
+		class="nav-item"
+		class:active={path === '/departures'}
+		data-sveltekit-reload
+	>
+		<span class="icon">◉</span>
+		<span class="label">Departures</span>
+	</a>
 	<a href="/board" class="nav-item" class:active={path === '/board'} data-sveltekit-reload>
 		<span class="icon">▤</span>
 		<span class="label">Board</span>
