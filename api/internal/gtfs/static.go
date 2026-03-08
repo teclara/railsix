@@ -8,7 +8,7 @@ import (
 
 	"github.com/jamespfennell/gtfs"
 
-	"github.com/dubthecoder/railsix/api/internal/models"
+	"github.com/teclara/railsix/api/internal/models"
 )
 
 // ScheduledDeparture is a single stop-time entry in the schedule index.

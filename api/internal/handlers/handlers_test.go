@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	gtfsstore "github.com/dubthecoder/railsix/api/internal/gtfs"
-	"github.com/dubthecoder/railsix/api/internal/handlers"
-	"github.com/dubthecoder/railsix/api/internal/models"
+	gtfsstore "github.com/teclara/railsix/api/internal/gtfs"
+	"github.com/teclara/railsix/api/internal/handlers"
+	"github.com/teclara/railsix/api/internal/models"
 )
 
 func buildTestZip(t *testing.T) []byte {

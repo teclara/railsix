@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dubthecoder/railsix/api/internal/models"
+	"github.com/teclara/railsix/api/internal/models"
 )
 
 const (

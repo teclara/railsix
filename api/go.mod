@@ -1,4 +1,4 @@
-module github.com/dubthecoder/railsix/api
+module github.com/teclara/railsix/api
 
 go 1.22.5
 

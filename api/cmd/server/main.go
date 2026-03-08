@@ -11,10 +11,10 @@ import (
 	"time"
 	_ "time/tzdata"
 
-	"github.com/dubthecoder/railsix/api/internal/config"
-	gtfsstore "github.com/dubthecoder/railsix/api/internal/gtfs"
-	"github.com/dubthecoder/railsix/api/internal/handlers"
-	"github.com/dubthecoder/railsix/api/internal/metrolinx"
+	"github.com/teclara/railsix/api/internal/config"
+	gtfsstore "github.com/teclara/railsix/api/internal/gtfs"
+	"github.com/teclara/railsix/api/internal/handlers"
+	"github.com/teclara/railsix/api/internal/metrolinx"
 )
 
 func main() {

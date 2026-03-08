@@ -3,8 +3,8 @@ package gtfs_test
 import (
 	"testing"
 
-	gtfsstore "github.com/dubthecoder/railsix/api/internal/gtfs"
-	"github.com/dubthecoder/railsix/api/internal/models"
+	gtfsstore "github.com/teclara/railsix/api/internal/gtfs"
+	"github.com/teclara/railsix/api/internal/models"
 )
 
 type mockStaticLookup struct{}
