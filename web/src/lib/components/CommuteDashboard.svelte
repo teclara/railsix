@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 	import { commute, notificationPrefs, getActiveDirection } from '$lib/stores/commute';
 	import type { CommuteStore } from '$lib/stores/commute';
 	import type { Stop } from '$lib/api';
@@ -102,12 +103,13 @@
 
 	onMount(() => {
 		loadDepartures();
-		loadAlerts();
+		// Alerts are already loaded via SSR (initialAlerts prop) — skip initial fetch.
 		loadNetworkHealth();
 		loadFares();
 		departInterval = setInterval(loadDepartures, 30_000);
 		alertInterval = setInterval(loadAlerts, 60_000);
 		healthInterval = setInterval(loadNetworkHealth, 30_000);
+		mounted = true;
 	});
 
 	onDestroy(() => {
@@ -117,11 +119,14 @@
 		unsubCommute();
 	});
 
+	let mounted = $state(false);
 	$effect(() => {
-		// Reload when active trip changes
+		// Reload when active trip changes (skip SSR and initial mount — onMount handles that)
 		activeTrip;
-		loadDepartures();
-		loadFares();
+		if (browser && mounted) {
+			loadDepartures();
+			loadFares();
+		}
 	});
 
 	// Pass empty array — AlertBanner shows all alerts when no route filter is provided

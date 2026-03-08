@@ -14,6 +14,12 @@
 		return str.toUpperCase().padEnd(len, ' ').slice(0, len);
 	}
 
+	function padCenter(str: string, len: number): string {
+		const s = str.toUpperCase().slice(0, len);
+		const left = Math.floor((len - s.length) / 2);
+		return s.padStart(s.length + left, ' ').padEnd(len, ' ');
+	}
+
 	function formatTime(t: string): string {
 		return t.slice(0, 5);
 	}
@@ -66,7 +72,7 @@
 			{/each}
 		</span>
 		<span class="col-platform text-white">
-			{#each padRight('PLAT', 7).split('') as char}
+			{#each padCenter('PLATFRM', 7).split('') as char}
 				<SplitFlapChar value={char} delay={0} />
 			{/each}
 		</span>
@@ -109,7 +115,7 @@
 			</span>
 
 			<span class="col-platform text-white">
-				{#each padRight(dep.platform ?? '--', 7).split('') as char, j}
+				{#each padCenter(dep.platform ?? '--', 7).split('') as char, j}
 					<SplitFlapChar value={char} delay={100 + j * 20} />
 				{/each}
 			</span>
@@ -199,6 +205,7 @@
 	}
 	.col-platform {
 		font-size: 0.85em;
+		justify-content: center;
 	}
 	.col-arrival {
 		font-size: 0.85em;

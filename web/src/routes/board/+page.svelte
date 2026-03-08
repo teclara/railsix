@@ -12,11 +12,21 @@
 	let { data }: { data: { departures: UnionDeparture[]; stops: Stop[] } } = $props();
 
 	function sortByTime(deps: UnionDeparture[]) {
-		return [...deps].sort((a, b) => a.time.localeCompare(b.time));
+		const nowH = new Date().getHours();
+		const adjust = (t: string) => {
+			const h = parseInt(t.slice(0, 2), 10);
+			// If current hour is afternoon+ and the departure is early morning, push it after midnight
+			return h < 6 && nowH >= 12 ? h + 24 : h;
+		};
+		return [...deps].sort((a, b) => {
+			const ha = adjust(a.time) * 60 + parseInt(a.time.slice(3, 5), 10);
+			const hb = adjust(b.time) * 60 + parseInt(b.time.slice(3, 5), 10);
+			return ha - hb;
+		});
 	}
 
 	let polledDepartures = $state<UnionDeparture[] | null>(null);
-	let departures = $derived(sortByTime(polledDepartures ?? data.departures));
+	let departures = $derived(sortByTime(polledDepartures ?? data.departures).slice(0, 10));
 	let clock = $state('');
 	let clockInterval: ReturnType<typeof setInterval>;
 	let pollInterval: ReturnType<typeof setInterval>;
@@ -53,7 +63,12 @@
 	async function loadDepartures() {
 		if (selectedStation) {
 			const deps = await fetchDepartures(selectedStation);
-			stationDepartures = deps;
+			const nowH = new Date().getHours();
+			const toMin = (t: string) => {
+				const h = parseInt(t.slice(0, 2), 10);
+				return (h < 6 && nowH >= 12 ? h + 24 : h) * 60 + parseInt(t.slice(3, 5), 10);
+			};
+			stationDepartures = deps.sort((a, b) => toMin(a.scheduledTime) - toMin(b.scheduledTime)).slice(0, 10);
 		} else {
 			const deps = await fetchUnionDepartures();
 			if (deps.length > 0) polledDepartures = deps;
@@ -80,15 +95,26 @@
 		updateClock();
 		clockInterval = setInterval(updateClock, 1000);
 		pollInterval = setInterval(loadDepartures, 30_000);
+		fitBoard();
+		window.addEventListener('resize', fitBoard);
 	});
 
 	onDestroy(() => {
 		clearInterval(clockInterval);
 		clearInterval(pollInterval);
+		if (typeof window !== 'undefined') {
+			window.removeEventListener('resize', fitBoard);
+		}
 	});
 
 	function padRight(str: string, len: number): string {
 		return str.toUpperCase().padEnd(len, ' ').slice(0, len);
+	}
+
+	function padCenter(str: string, len: number): string {
+		const s = str.toUpperCase().slice(0, len);
+		const left = Math.floor((len - s.length) / 2);
+		return s.padStart(s.length + left, ' ').padEnd(len, ' ');
 	}
 
 	function infoClass(info: string): string {
@@ -109,30 +135,73 @@
 		if (d.delayMinutes && d.delayMinutes > 0) return `+${d.delayMinutes}M`;
 		return 'ON TIME';
 	}
+
+	let boardEl: HTMLElement;
+
+	function fitBoard() {
+		if (!boardEl) return;
+		// Reset to base size first
+		boardEl.style.fontSize = '';
+		// Get the computed base font size
+		const base = parseFloat(getComputedStyle(boardEl).fontSize);
+		// Use the board's actual available height (accounts for nav bars, bottom bars, etc.)
+		const available = boardEl.clientHeight;
+		const content = boardEl.scrollHeight;
+		if (content > available) {
+			const scale = available / content;
+			boardEl.style.fontSize = `${base * scale}px`;
+		}
+	}
+
+	// Re-fit when departures change (client-side only)
+	$effect(() => {
+		departures;
+		stationDepartures;
+		if (typeof window !== 'undefined') {
+			requestAnimationFrame(fitBoard);
+		}
+	});
+
+	function marquee(node: HTMLElement) {
+		const inner = node.querySelector('.stops-scroll') as HTMLElement;
+		if (!inner) return;
+
+		function update() {
+			const overflow = inner.scrollWidth - node.clientWidth;
+			if (overflow > 0) {
+				inner.style.setProperty('--overflow', `${overflow}px`);
+				inner.style.animation = 'boomerang 10s ease-in-out infinite alternate';
+			} else {
+				inner.style.animation = '';
+			}
+		}
+
+		update();
+		const ro = new ResizeObserver(update);
+		ro.observe(node);
+		return { destroy: () => ro.disconnect() };
+	}
 </script>
 
 <svelte:head>
 	<title>{selectedStopName || 'Union Station'} — Six Rail</title>
 </svelte:head>
 
-<div class="board font-mono select-none bg-[#0a0a0a] min-h-screen text-white">
+<div class="board font-mono select-none bg-[#0a0a0a] text-white" bind:this={boardEl}>
 	<!-- Header -->
-	<div class="board-header px-4 py-3 flex items-center justify-between border-b border-[#1a1a1a]">
+	<div class="board-header">
 		<div>
-			<h1 class="text-amber-400 text-sm font-bold uppercase tracking-[0.2em]">
+			<h1 class="text-amber-400 font-bold uppercase tracking-[0.2em]" style="font-size: 0.85em;">
 				{selectedStopName || 'Union Station GO'}
 			</h1>
-			<p class="text-gray-600 text-xs tracking-widest uppercase">Departures</p>
+			<p class="text-gray-600 tracking-widest uppercase" style="font-size: 0.6em;">Departures</p>
 		</div>
-		<div class="text-amber-400 text-lg tracking-widest tabular-nums">{clock}</div>
-	</div>
-
-	<!-- Station dropdown -->
-	<div class="flex items-center border-b border-[#1a1a1a]">
-		<div class="station-picker ml-auto relative">
+		<div class="text-amber-400 tracking-widest tabular-nums" style="font-size: 1.1em;">{clock}</div>
+		<div class="station-picker relative">
 			{#if selectedStation}
 				<button
-					class="px-3 py-2 text-xs uppercase tracking-widest text-amber-400 font-bold flex items-center gap-1"
+					class="uppercase tracking-widest text-amber-400 font-bold flex items-center gap-1"
+					style="font-size: 0.6em;"
 					onclick={clearStation}
 				>
 					{selectedStopName}
@@ -140,7 +209,8 @@
 				</button>
 			{:else}
 				<button
-					class="px-3 py-2 text-xs uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+					class="uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+					style="font-size: 0.6em;"
 					onclick={() => (dropdownOpen = !dropdownOpen)}
 				>
 					Station ▾
@@ -177,9 +247,7 @@
 
 	{#if selectedStation}
 		<!-- Station departures view -->
-		<div
-			class="flap-row-station px-4 pt-3 pb-2 border-b border-[#161616]"
-		>
+		<div class="col-headers flap-row-station">
 			<span class="col-time text-amber-400">
 				{#each padRight('TIME', 5).split('') as char}
 					<SplitFlapChar value={char} delay={0} />
@@ -190,8 +258,13 @@
 					<SplitFlapChar value={char} delay={0} />
 				{/each}
 			</span>
+			<span class="col-cars text-gray-400">
+				{#each padCenter('CRS', 3).split('') as char}
+					<SplitFlapChar value={char} delay={0} />
+				{/each}
+			</span>
 			<span class="col-plat text-white">
-				{#each padRight('PLAT', 7).split('') as char}
+				{#each padCenter('PLATFRM', 7).split('') as char}
 					<SplitFlapChar value={char} delay={0} />
 				{/each}
 			</span>
@@ -202,7 +275,7 @@
 			</span>
 		</div>
 
-		<div class="rows px-4">
+		<div class="rows">
 			{#each stationDepartures as dep, i}
 				<div class="departure-row" class:first={i === 0}>
 					<div class="flap-row-station">
@@ -218,8 +291,14 @@
 							{/each}
 						</span>
 
+						<span class="col-cars text-gray-400">
+							{#each padRight(dep.cars ? dep.cars + 'C' : '---', 3).split('') as char, j}
+								<SplitFlapChar value={char} delay={40 + j * 15} />
+							{/each}
+						</span>
+
 						<span class="col-plat text-white">
-							{#each padRight(dep.platform || '--', 7).split('') as char, j}
+							{#each padCenter(dep.platform || '--', 7).split('') as char, j}
 								<SplitFlapChar value={char} delay={50 + j * 12} />
 							{/each}
 						</span>
@@ -232,26 +311,22 @@
 					</div>
 
 					{#if dep.stops && dep.stops.length > 0}
-						<div
-							class="stops-line text-gray-400 text-xs tracking-wide truncate pl-[calc(5*(1ch+2px)+8px)]"
-						>
-							{dep.stops.join(' · ')}
+						<div class="stops-line text-gray-400 tracking-wide" use:marquee>
+							<span class="stops-scroll">{dep.stops.join(' · ')}</span>
 						</div>
 					{/if}
 				</div>
 			{/each}
 
 			{#if stationDepartures.length === 0}
-				<div class="text-gray-700 font-mono text-sm py-16 text-center tracking-widest uppercase">
+				<div class="text-gray-700 font-mono text-center tracking-widest uppercase" style="font-size: 0.8em; padding: 2em 0;">
 					No departures
 				</div>
 			{/if}
 		</div>
 	{:else}
 		<!-- Union Station departures view -->
-		<div
-			class="flap-row px-4 pt-3 pb-2 border-b border-[#161616]"
-		>
+		<div class="col-headers flap-row">
 			<span class="col-time text-amber-400">
 				{#each padRight('TIME', 5).split('') as char}
 					<SplitFlapChar value={char} delay={0} />
@@ -263,7 +338,7 @@
 				{/each}
 			</span>
 			<span class="col-plat text-white">
-				{#each padRight('PLAT', 7).split('') as char}
+				{#each padCenter('PLATFRM', 7).split('') as char}
 					<SplitFlapChar value={char} delay={0} />
 				{/each}
 			</span>
@@ -274,7 +349,7 @@
 			</span>
 		</div>
 
-		<div class="rows px-4">
+		<div class="rows">
 			{#each departures as dep, i}
 				<div class="departure-row" class:first={i === 0}>
 					<div class="flap-row">
@@ -291,7 +366,7 @@
 						</span>
 
 						<span class="col-plat text-white">
-							{#each padRight(dep.platform || '--', 7).split('') as char, j}
+							{#each padCenter(dep.platform || '--', 7).split('') as char, j}
 								<SplitFlapChar value={char} delay={50 + j * 12} />
 							{/each}
 						</span>
@@ -304,17 +379,15 @@
 					</div>
 
 					{#if dep.stops.length > 0}
-						<div
-							class="stops-line text-gray-400 text-xs tracking-wide truncate pl-[calc(5*(1ch+2px)+8px)]"
-						>
-							{dep.stops.join(' · ')}
+						<div class="stops-line text-gray-400 tracking-wide" use:marquee>
+							<span class="stops-scroll">{dep.stops.join(' · ')}</span>
 						</div>
 					{/if}
 				</div>
 			{/each}
 
 			{#if departures.length === 0}
-				<div class="text-gray-700 font-mono text-sm py-16 text-center tracking-widest uppercase">
+				<div class="text-gray-700 font-mono text-center tracking-widest uppercase" style="font-size: 0.8em; padding: 2em 0;">
 					No departures
 				</div>
 			{/if}
@@ -323,23 +396,54 @@
 </div>
 
 <style>
+	/* ── Viewport-scaling board ── */
+	.board {
+		height: calc(100dvh - 60px);
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		/* Scale base font with viewport — works from phone to TV */
+		font-size: clamp(14px, 2.4vw, 48px);
+	}
+
+	.board-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.4em 0.8em;
+		border-bottom: 1px solid #1a1a1a;
+		flex-shrink: 0;
+	}
+
+	.col-headers {
+		padding: 0.3em 0.8em;
+		border-bottom: 1px solid #161616;
+		flex-shrink: 0;
+	}
+
+	.rows {
+		flex: 1;
+		padding: 0 0.8em;
+	}
+
 	.flap-row {
 		display: grid;
-		grid-template-columns: 5ch 16ch 7ch 7ch;
-		gap: 8px;
+		grid-template-columns: 5ch 1fr 7ch 7ch;
+		gap: 0.4em;
 		align-items: center;
 	}
 
 	.flap-row-station {
 		display: grid;
-		grid-template-columns: 5ch 14ch 7ch 7ch;
-		gap: 8px;
+		grid-template-columns: 5ch 1fr 3ch 7ch 7ch;
+		gap: 0.4em;
 		align-items: center;
 	}
 
 	.col-time,
 	.col-service,
 	.col-line,
+	.col-cars,
 	.col-plat,
 	.col-info,
 	.col-status {
@@ -355,6 +459,11 @@
 	}
 	.col-plat {
 		font-size: 0.85em;
+		justify-content: center;
+	}
+	.col-cars {
+		font-size: 0.8em;
+		justify-content: center;
 	}
 	.col-info,
 	.col-status {
@@ -363,19 +472,36 @@
 
 	.departure-row {
 		border-bottom: 1px solid #161616;
-		padding: 8px 0;
+		padding: 0.6em 0;
 	}
 
 	.departure-row.first {
 		border-bottom-color: #222;
-		padding: 10px 0;
 	}
 
 	.stops-line {
-		margin-top: 3px;
+		margin-top: 0.15em;
+		font-size: 0.55em;
+		padding-left: 0;
+		overflow: hidden;
+		white-space: nowrap;
 	}
 
-	/* Station dropdown */
+	.stops-scroll {
+		display: inline-block;
+		white-space: nowrap;
+	}
+
+	@keyframes boomerang {
+		0%, 20% {
+			transform: translateX(0);
+		}
+		80%, 100% {
+			transform: translateX(calc(-1 * var(--overflow, 0px)));
+		}
+	}
+
+	/* ── Station dropdown ── */
 	.station-picker {
 		position: relative;
 	}
@@ -397,6 +523,7 @@
 		z-index: 50;
 		overflow: hidden;
 		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+		font-size: 14px; /* dropdown stays fixed size */
 	}
 
 	.dropdown-search {
@@ -456,15 +583,26 @@
 		border-radius: 2px;
 	}
 
+	/* ── Small screens ── */
 	@media (max-width: 480px) {
-		.flap-row {
-			grid-template-columns: 5ch 13ch 7ch 7ch;
-			gap: 4px;
+		.board {
+			font-size: clamp(12px, 3.8vw, 20px);
 		}
 
+		.flap-row {
+			grid-template-columns: 5ch 1fr 5ch 7ch;
+			gap: 0.3em;
+		}
 		.flap-row-station {
-			grid-template-columns: 5ch 11ch 7ch 7ch;
-			gap: 4px;
+			grid-template-columns: 5ch 1fr 3ch 5ch 7ch;
+			gap: 0.3em;
+		}
+	}
+
+	/* ── Large screens / TV ── */
+	@media (min-width: 1400px) {
+		.board {
+			font-size: clamp(24px, 2.4vw, 60px);
 		}
 	}
 </style>

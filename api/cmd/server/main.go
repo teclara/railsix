@@ -58,6 +58,7 @@ func main() {
 			gtfsstore.StartTripUpdatePoller(ctx, mxClient, rtCache, 30*time.Second)
 			gtfsstore.StartServiceGlancePoller(ctx, mxClient, rtCache, 30*time.Second)
 			gtfsstore.StartExceptionsPoller(ctx, mxClient, rtCache, 60*time.Second)
+			gtfsstore.StartUnionDeparturesPoller(ctx, mxClient, rtCache, 30*time.Second)
 		}
 	}
 

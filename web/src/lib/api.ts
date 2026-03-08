@@ -26,21 +26,12 @@ export interface Stop {
 	id: string;
 	code: string;
 	name: string;
-	lat: number;
-	lon: number;
-	parentId?: string;
 }
 
 export interface Alert {
-	id: string;
-	effect: string;
 	headline: string;
 	description: string;
-	url?: string;
-	routeIds?: string[];
 	routeNames?: string[];
-	startTime?: number;
-	endTime?: number;
 }
 
 export function getAllStops() {

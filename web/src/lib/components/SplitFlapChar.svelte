@@ -86,7 +86,7 @@
 		border-radius: 2px;
 		overflow: hidden;
 		box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
-		margin: 0 1px;
+		margin: 0 0.05em;
 		font-variant-numeric: tabular-nums;
 	}
 

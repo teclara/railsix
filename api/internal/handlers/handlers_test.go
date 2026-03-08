@@ -105,11 +105,13 @@ func TestAlerts(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var alerts []models.Alert
+	var alerts []struct {
+		Headline string `json:"headline"`
+	}
 	if err := json.Unmarshal(w.Body.Bytes(), &alerts); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-	if len(alerts) != 1 || alerts[0].ID != "A1" {
+	if len(alerts) != 1 || alerts[0].Headline != "Delay on LW" {
 		t.Fatalf("unexpected alerts: %+v", alerts)
 	}
 }

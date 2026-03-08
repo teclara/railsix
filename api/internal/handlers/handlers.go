@@ -50,24 +50,79 @@ func respondJSON(w http.ResponseWriter, v any) {
 	writeJSON(w, http.StatusOK, data)
 }
 
-// AllStops serves stops from GTFS static data.
-func (h *Handlers) AllStops(w http.ResponseWriter, r *http.Request) {
-	stops := h.static.AllStops()
-	respondJSON(w, stops)
+// --- Slim response types (only fields the frontend uses) ---
+
+type stopResponse struct {
+	ID   string `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
 }
 
-// Alerts serves enriched alerts from the realtime cache.
+type alertResponse struct {
+	Headline    string   `json:"headline"`
+	Description string   `json:"description"`
+	RouteNames  []string `json:"routeNames,omitempty"`
+}
+
+type departureResponse struct {
+	Line          string   `json:"line"`
+	LineName      string   `json:"lineName,omitempty"`
+	ScheduledTime string   `json:"scheduledTime"`
+	ArrivalTime   string   `json:"arrivalTime,omitempty"`
+	Status        string   `json:"status"`
+	Platform      string   `json:"platform,omitempty"`
+	DelayMinutes  int      `json:"delayMinutes,omitempty"`
+	Stops         []string `json:"stops,omitempty"`
+	Occupancy     int      `json:"occupancy,omitempty"`
+	Cars          string   `json:"cars,omitempty"`
+	IsCancelled   bool     `json:"isCancelled,omitempty"`
+}
+
+type unionDepartureResponse struct {
+	Service  string   `json:"service"`
+	Platform string   `json:"platform"`
+	Time     string   `json:"time"`
+	Info     string   `json:"info"`
+	Stops    []string `json:"stops"`
+}
+
+type fareResponse struct {
+	Category string  `json:"category"`
+	FareType string  `json:"fareType"`
+	Amount   float64 `json:"amount"`
+}
+
+// AllStops serves stops from GTFS static data (slim: no lat/lon/parentId).
+func (h *Handlers) AllStops(w http.ResponseWriter, r *http.Request) {
+	stops := h.static.AllStops()
+	slim := make([]stopResponse, len(stops))
+	for i, s := range stops {
+		slim[i] = stopResponse{ID: s.ID, Code: s.Code, Name: s.Name}
+	}
+	respondJSON(w, slim)
+}
+
+// Alerts serves enriched alerts from the realtime cache (slim: headline, description, routeNames only).
 func (h *Handlers) Alerts(w http.ResponseWriter, r *http.Request) {
 	alerts := h.rt.GetAlerts()
 	if alerts == nil {
-		alerts = []models.Alert{}
+		respondJSON(w, []alertResponse{})
+		return
 	}
-	respondJSON(w, alerts)
+	slim := make([]alertResponse, len(alerts))
+	for i, a := range alerts {
+		slim[i] = alertResponse{
+			Headline:    a.Headline,
+			Description: a.Description,
+			RouteNames:  a.RouteNames,
+		}
+	}
+	respondJSON(w, slim)
 }
 
 // StopDepartures returns GTFS-based departures for a stop code, enriched with
 // real-time NextService data (platform + computed time) when available.
-// Optional query param ?dest=<stopCode> populates ArrivalTime at the destination.
+// Uses a 30s TTL cache for NextService to avoid per-request upstream calls.
 func (h *Handlers) StopDepartures(w http.ResponseWriter, r *http.Request) {
 	stopCode := r.PathValue("stopCode")
 	if !stopCodeRe.MatchString(stopCode) {
@@ -80,9 +135,16 @@ func (h *Handlers) StopDepartures(w http.ResponseWriter, r *http.Request) {
 	}
 	departures := gtfsstore.GetDepartures(stopCode, destCode, time.Now(), h.static, h.rt)
 
-	// Enrich with Metrolinx NextService real-time data when available.
+	// Enrich with NextService real-time data (cached with 30s TTL).
 	if h.mx != nil && len(departures) > 0 {
-		if nsLines, err := h.mx.GetNextService(r.Context(), stopCode); err == nil {
+		nsLines, ok := h.rt.GetNextService(stopCode)
+		if !ok {
+			if fetched, err := h.mx.GetNextService(r.Context(), stopCode); err == nil {
+				nsLines = fetched
+				h.rt.SetNextService(stopCode, fetched)
+			}
+		}
+		if nsLines != nil {
 			byLine := make(map[string][]models.NextServiceLine, len(nsLines))
 			for _, l := range nsLines {
 				byLine[l.LineCode] = append(byLine[l.LineCode], l)
@@ -105,7 +167,24 @@ func (h *Handlers) StopDepartures(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	respondJSON(w, departures)
+	// Return slim response (no destination, routeColor).
+	slim := make([]departureResponse, len(departures))
+	for i, d := range departures {
+		slim[i] = departureResponse{
+			Line:          d.Line,
+			LineName:      d.LineName,
+			ScheduledTime: d.ScheduledTime,
+			ArrivalTime:   d.ArrivalTime,
+			Status:        d.Status,
+			Platform:      d.Platform,
+			DelayMinutes:  d.DelayMinutes,
+			Stops:         d.Stops,
+			Occupancy:     d.Occupancy,
+			Cars:          d.Cars,
+			IsCancelled:   d.IsCancelled,
+		}
+	}
+	respondJSON(w, slim)
 }
 
 // bestNSMatch returns the NextServiceLine whose ComputedTime is within 10 minutes
@@ -161,7 +240,7 @@ func (h *Handlers) NetworkHealth(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, result)
 }
 
-// Fares returns fare information between two stations.
+// Fares returns fare information between two stations (cached with 1h TTL).
 func (h *Handlers) Fares(w http.ResponseWriter, r *http.Request) {
 	fromCode := r.PathValue("from")
 	toCode := r.PathValue("to")
@@ -170,29 +249,51 @@ func (h *Handlers) Fares(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.mx == nil {
-		respondJSON(w, []models.FareInfo{})
+		respondJSON(w, []fareResponse{})
 		return
 	}
-	fares, err := h.mx.GetFares(r.Context(), fromCode, toCode)
-	if err != nil {
-		slog.Warn("fares fetch failed", "error", err)
-		respondJSON(w, []models.FareInfo{})
-		return
+
+	var fares []models.FareInfo
+	if cached, ok := h.rt.GetFares(fromCode, toCode); ok {
+		fares = cached
+	} else {
+		fetched, err := h.mx.GetFares(r.Context(), fromCode, toCode)
+		if err != nil {
+			slog.Warn("fares fetch failed", "error", err)
+			respondJSON(w, []fareResponse{})
+			return
+		}
+		fares = fetched
+		h.rt.SetFares(fromCode, toCode, fetched)
 	}
-	respondJSON(w, fares)
+
+	slim := make([]fareResponse, len(fares))
+	for i, f := range fares {
+		slim[i] = fareResponse{
+			Category: f.Category,
+			FareType: f.FareType,
+			Amount:   f.Amount,
+		}
+	}
+	respondJSON(w, slim)
 }
 
-// UnionDepartures returns live departures from Union Station via the Metrolinx REST API.
+// UnionDepartures serves cached Union Station departures (polled every 30s).
 func (h *Handlers) UnionDepartures(w http.ResponseWriter, r *http.Request) {
-	if h.mx == nil {
-		respondJSON(w, []models.UnionDeparture{})
+	deps := h.rt.GetUnionDepartures()
+	if deps == nil {
+		respondJSON(w, []unionDepartureResponse{})
 		return
 	}
-	deps, err := h.mx.GetUnionDepartures(r.Context())
-	if err != nil {
-		slog.Warn("union departures fetch failed", "error", err)
-		respondJSON(w, []models.UnionDeparture{})
-		return
+	slim := make([]unionDepartureResponse, len(deps))
+	for i, d := range deps {
+		slim[i] = unionDepartureResponse{
+			Service:  d.Service,
+			Platform: d.Platform,
+			Time:     d.Time,
+			Info:     d.Info,
+			Stops:    d.Stops,
+		}
 	}
-	respondJSON(w, deps)
+	respondJSON(w, slim)
 }

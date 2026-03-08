@@ -119,14 +119,28 @@ type RawTripUpdate struct {
 
 // --- Cache ---
 
+// UnionDeparturesFetcher fetches the Union Station departures board.
+type UnionDeparturesFetcher interface {
+	GetUnionDepartures(ctx context.Context) ([]models.UnionDeparture, error)
+}
+
+// ttlEntry is a generic time-stamped cache entry.
+type ttlEntry[T any] struct {
+	data      T
+	fetchedAt time.Time
+}
+
 // RealtimeCache is a thread-safe store for enriched positions, alerts, trip updates,
-// service glance data, and exception/cancellation info.
+// service glance data, exception/cancellation info, and TTL caches.
 type RealtimeCache struct {
-	mu             sync.RWMutex
-	alerts         []models.Alert
-	tripUpdates    map[string]RawTripUpdate
-	serviceGlance  map[string]models.ServiceGlanceEntry // keyed by trip number
-	cancelledTrips map[string]bool                       // set of cancelled trip numbers
+	mu               sync.RWMutex
+	alerts           []models.Alert
+	tripUpdates      map[string]RawTripUpdate
+	serviceGlance    map[string]models.ServiceGlanceEntry // keyed by trip number
+	cancelledTrips   map[string]bool                       // set of cancelled trip numbers
+	unionDepartures  []models.UnionDeparture
+	nextService      map[string]ttlEntry[[]models.NextServiceLine] // keyed by stopCode, 30s TTL
+	fares            map[string]ttlEntry[[]models.FareInfo]         // keyed by "from|to", 1h TTL
 }
 
 func NewRealtimeCache() *RealtimeCache {
@@ -134,6 +148,8 @@ func NewRealtimeCache() *RealtimeCache {
 		tripUpdates:    make(map[string]RawTripUpdate),
 		serviceGlance:  make(map[string]models.ServiceGlanceEntry),
 		cancelledTrips: make(map[string]bool),
+		nextService:    make(map[string]ttlEntry[[]models.NextServiceLine]),
+		fares:          make(map[string]ttlEntry[[]models.FareInfo]),
 	}
 }
 
@@ -199,6 +215,70 @@ func (rc *RealtimeCache) IsTripCancelled(tripNumber string) bool {
 	rc.mu.RLock()
 	defer rc.mu.RUnlock()
 	return rc.cancelledTrips[tripNumber]
+}
+
+// --- Union departures cache ---
+
+func (rc *RealtimeCache) SetUnionDepartures(deps []models.UnionDeparture) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.unionDepartures = deps
+}
+
+func (rc *RealtimeCache) GetUnionDepartures() []models.UnionDeparture {
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
+	out := make([]models.UnionDeparture, len(rc.unionDepartures))
+	copy(out, rc.unionDepartures)
+	return out
+}
+
+// --- NextService TTL cache (30s) ---
+
+func (rc *RealtimeCache) GetNextService(stopCode string) ([]models.NextServiceLine, bool) {
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
+	entry, ok := rc.nextService[stopCode]
+	if !ok || time.Since(entry.fetchedAt) > 30*time.Second {
+		return nil, false
+	}
+	return entry.data, true
+}
+
+func (rc *RealtimeCache) SetNextService(stopCode string, lines []models.NextServiceLine) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.nextService[stopCode] = ttlEntry[[]models.NextServiceLine]{data: lines, fetchedAt: time.Now()}
+	// Evict stale entries
+	for k, v := range rc.nextService {
+		if time.Since(v.fetchedAt) > 5*time.Minute {
+			delete(rc.nextService, k)
+		}
+	}
+}
+
+// --- Fares TTL cache (1h) ---
+
+func (rc *RealtimeCache) GetFares(from, to string) ([]models.FareInfo, bool) {
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
+	entry, ok := rc.fares[from+"|"+to]
+	if !ok || time.Since(entry.fetchedAt) > time.Hour {
+		return nil, false
+	}
+	return entry.data, true
+}
+
+func (rc *RealtimeCache) SetFares(from, to string, fares []models.FareInfo) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.fares[from+"|"+to] = ttlEntry[[]models.FareInfo]{data: fares, fetchedAt: time.Now()}
+	// Evict stale entries
+	for k, v := range rc.fares {
+		if time.Since(v.fetchedAt) > 2*time.Hour {
+			delete(rc.fares, k)
+		}
+	}
 }
 
 // --- JSON parsers ---
@@ -466,4 +546,32 @@ func fetchAndCacheExceptions(ctx context.Context, fetcher ServiceGlanceFetcher, 
 	}
 	cache.SetCancelledTrips(cancelled)
 	slog.Info("exceptions updated", "cancelledTrips", len(cancelled))
+}
+
+// StartUnionDeparturesPoller polls the Union Station departures board.
+func StartUnionDeparturesPoller(ctx context.Context, fetcher UnionDeparturesFetcher, cache *RealtimeCache, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		fetchAndCacheUnionDepartures(ctx, fetcher, cache)
+		for {
+			select {
+			case <-ctx.Done():
+				slog.Info("union departures poller stopped")
+				return
+			case <-ticker.C:
+				fetchAndCacheUnionDepartures(ctx, fetcher, cache)
+			}
+		}
+	}()
+}
+
+func fetchAndCacheUnionDepartures(ctx context.Context, fetcher UnionDeparturesFetcher, cache *RealtimeCache) {
+	deps, err := fetcher.GetUnionDepartures(ctx)
+	if err != nil {
+		slog.Error("fetching union departures", "error", err)
+		return
+	}
+	cache.SetUnionDepartures(deps)
+	slog.Info("union departures updated", "count", len(deps))
 }

@@ -9,12 +9,10 @@ export async function fetchAlerts(): Promise<Alert[]> {
 export type Departure = {
 	line: string;
 	lineName?: string;
-	destination: string;
 	scheduledTime: string;
 	arrivalTime?: string;
 	status: string;
 	platform?: string;
-	routeColor?: string;
 	delayMinutes?: number;
 	stops?: string[];
 	occupancy?: number;
@@ -32,7 +30,6 @@ export async function fetchDepartures(stopCode: string, destCode?: string): Prom
 }
 
 export type UnionDeparture = {
-	tripNumber: string;
 	service: string;
 	platform: string;
 	time: string;
@@ -60,7 +57,6 @@ export async function fetchNetworkHealth(): Promise<NetworkLine[]> {
 
 export type FareInfo = {
 	category: string;
-	ticketType: string;
 	fareType: string;
 	amount: number;
 };
