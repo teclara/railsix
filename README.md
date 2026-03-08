@@ -1,5 +1,8 @@
 # Rail Six
 
+![API](https://github.com/teclara/railsix/actions/workflows/api.yml/badge.svg)
+![Web](https://github.com/teclara/railsix/actions/workflows/web.yml/badge.svg)
+
 Real-time GO Transit tracking for Toronto commuters. Split-flap departure board, commute dashboard with countdown timer, delay alerts, and network health — free, no ads.
 
 ## Features
