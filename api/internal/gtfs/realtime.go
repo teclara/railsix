@@ -267,6 +267,11 @@ func (rc *RealtimeCache) GetUnionDepartures() []models.UnionDeparture {
 	return out
 }
 
+const (
+	maxNextServiceEntries = 500
+	maxFaresEntries       = 200
+)
+
 // --- NextService TTL cache (30s) ---
 
 func (rc *RealtimeCache) GetNextService(stopCode string) ([]models.NextServiceLine, bool) {
@@ -288,6 +293,18 @@ func (rc *RealtimeCache) SetNextService(stopCode string, lines []models.NextServ
 		if time.Since(v.fetchedAt) > 5*time.Minute {
 			delete(rc.nextService, k)
 		}
+	}
+	// Cap max size by removing oldest entries
+	for len(rc.nextService) > maxNextServiceEntries {
+		oldestKey := ""
+		var oldestTime time.Time
+		for k, v := range rc.nextService {
+			if oldestKey == "" || v.fetchedAt.Before(oldestTime) {
+				oldestKey = k
+				oldestTime = v.fetchedAt
+			}
+		}
+		delete(rc.nextService, oldestKey)
 	}
 }
 
@@ -312,6 +329,18 @@ func (rc *RealtimeCache) SetFares(from, to string, fares []models.FareInfo) {
 		if time.Since(v.fetchedAt) > 2*time.Hour {
 			delete(rc.fares, k)
 		}
+	}
+	// Cap max size by removing oldest entries
+	for len(rc.fares) > maxFaresEntries {
+		oldestKey := ""
+		var oldestTime time.Time
+		for k, v := range rc.fares {
+			if oldestKey == "" || v.fetchedAt.Before(oldestTime) {
+				oldestKey = k
+				oldestTime = v.fetchedAt
+			}
+		}
+		delete(rc.fares, oldestKey)
 	}
 }
 

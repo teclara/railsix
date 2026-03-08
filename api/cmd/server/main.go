@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"io"
 	"log/slog"
@@ -81,8 +82,15 @@ func main() {
 	}
 	handler = corsMiddleware(cfg.AllowedOrigins, handler)
 
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
 	slog.Info("starting sixrail-api", "port", cfg.Port)
-	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {
+	if err := srv.ListenAndServe(); err != nil {
 		slog.Error("server failed", "error", err)
 		os.Exit(1)
 	}
@@ -130,7 +138,7 @@ func apiKeyMiddleware(key string, next http.Handler) http.Handler {
 		if provided == "" {
 			provided = r.URL.Query().Get("key")
 		}
-		if provided != key {
+		if provided == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(key)) != 1 {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte(`{"error":"unauthorized"}`))

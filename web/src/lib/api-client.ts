@@ -1,7 +1,7 @@
 import type { Alert } from './api';
 
 export async function fetchAlerts(): Promise<Alert[]> {
-	const res = await fetch('/api/alerts');
+	const res = await fetch('/api/alerts', { signal: AbortSignal.timeout(10000) });
 	if (!res.ok) return [];
 	return res.json();
 }
@@ -27,7 +27,7 @@ export async function fetchDepartures(stopCode: string, destCode?: string): Prom
 	const url = destCode
 		? `/api/departures/${encodeURIComponent(stopCode)}?dest=${encodeURIComponent(destCode)}`
 		: `/api/departures/${encodeURIComponent(stopCode)}`;
-	const res = await fetch(url);
+	const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
 	if (!res.ok) return [];
 	return res.json();
 }
@@ -46,7 +46,7 @@ export type UnionDeparture = {
 };
 
 export async function fetchUnionDepartures(): Promise<UnionDeparture[]> {
-	const res = await fetch('/api/union-departures');
+	const res = await fetch('/api/union-departures', { signal: AbortSignal.timeout(10000) });
 	if (!res.ok) return [];
 	return res.json();
 }
@@ -58,7 +58,7 @@ export type NetworkLine = {
 };
 
 export async function fetchNetworkHealth(): Promise<NetworkLine[]> {
-	const res = await fetch('/api/network-health');
+	const res = await fetch('/api/network-health', { signal: AbortSignal.timeout(10000) });
 	if (!res.ok) return [];
 	return res.json();
 }
@@ -70,7 +70,7 @@ export type FareInfo = {
 };
 
 export async function fetchFares(from: string, to: string): Promise<FareInfo[]> {
-	const res = await fetch(`/api/fares/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
+	const res = await fetch(`/api/fares/${encodeURIComponent(from)}/${encodeURIComponent(to)}`, { signal: AbortSignal.timeout(10000) });
 	if (!res.ok) return [];
 	return res.json();
 }

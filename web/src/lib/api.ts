@@ -15,7 +15,10 @@ function authHeaders(): Record<string, string> {
 }
 
 async function fetchApi<T>(path: string): Promise<T> {
-	const res = await fetch(`${getBaseUrl()}${path}`, { headers: authHeaders() });
+	const res = await fetch(`${getBaseUrl()}${path}`, {
+		headers: authHeaders(),
+		signal: AbortSignal.timeout(5000),
+	});
 	if (!res.ok) {
 		throw new Error(`API error: ${res.status} ${res.statusText}`);
 	}
@@ -40,8 +43,8 @@ export function getAllStops() {
 
 export function getStopDepartures(stopCode: string, destCode?: string) {
 	const url = destCode
-		? `/api/departures/${stopCode}?dest=${encodeURIComponent(destCode)}`
-		: `/api/departures/${stopCode}`;
+		? `/api/departures/${encodeURIComponent(stopCode)}?dest=${encodeURIComponent(destCode)}`
+		: `/api/departures/${encodeURIComponent(stopCode)}`;
 	return fetchApi(url);
 }
 

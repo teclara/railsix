@@ -79,14 +79,30 @@
 	let trainDepartures = $derived(allGtfsDepartures.filter((d) => d.routeType !== 3).slice(0, 15));
 	let busDepartures = $derived(allGtfsDepartures.filter((d) => d.routeType === 3).slice(0, 15));
 
-	async function loadDepartures() {
-		const stopCode = selectedStation || 'UN';
-		const deps = await fetchDepartures(stopCode);
-		allGtfsDepartures = sortByScheduledTime(deps);
+	let loadController: AbortController | null = null;
 
-		if (!selectedStation) {
-			const unionDeps = await fetchUnionDepartures();
-			if (unionDeps.length > 0) polledDepartures = unionDeps;
+	async function loadDepartures() {
+		if (loadController) loadController.abort();
+		const controller = new AbortController();
+		loadController = controller;
+
+		const stopCode = selectedStation || 'UN';
+		try {
+			if (!selectedStation) {
+				const [deps, unionDeps] = await Promise.all([
+					fetchDepartures(stopCode),
+					fetchUnionDepartures()
+				]);
+				if (controller.signal.aborted) return;
+				allGtfsDepartures = sortByScheduledTime(deps);
+				if (unionDeps.length > 0) polledDepartures = unionDeps;
+			} else {
+				const deps = await fetchDepartures(stopCode);
+				if (controller.signal.aborted) return;
+				allGtfsDepartures = sortByScheduledTime(deps);
+			}
+		} catch {
+			// Ignore abort errors and fetch failures
 		}
 	}
 
@@ -220,13 +236,13 @@
 	}
 
 	function statusClass(d: Departure): string {
-		if (d.status === 'CANCELLED') return 'text-red-500';
+		if (d.isCancelled) return 'text-red-500';
 		if (d.delayMinutes && d.delayMinutes > 0) return 'text-amber-400';
 		return 'text-green-400';
 	}
 
 	function statusText(d: Departure): string {
-		if (d.status === 'CANCELLED') return 'CANCEL';
+		if (d.isCancelled) return 'CANCEL';
 		if (d.delayMinutes && d.delayMinutes > 0) return `+${d.delayMinutes}M`;
 		return 'ON TIME';
 	}

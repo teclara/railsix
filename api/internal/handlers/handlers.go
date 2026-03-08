@@ -39,7 +39,11 @@ func writeJSON(w http.ResponseWriter, status int, data []byte) {
 }
 
 func jsonError(w http.ResponseWriter, msg string, status int) {
-	writeJSON(w, status, []byte(`{"error":"`+msg+`"}`))
+	resp := struct {
+		Error string `json:"error"`
+	}{Error: msg}
+	data, _ := json.Marshal(resp)
+	writeJSON(w, status, data)
 }
 
 func respondJSON(w http.ResponseWriter, v any) {
@@ -96,9 +100,10 @@ type unionDepartureResponse struct {
 }
 
 type fareResponse struct {
-	Category string  `json:"category"`
-	FareType string  `json:"fareType"`
-	Amount   float64 `json:"amount"`
+	Category   string  `json:"category"`
+	FareType   string  `json:"fareType"`
+	Amount     float64 `json:"amount"`
+	TicketType string  `json:"ticketType,omitempty"`
 }
 
 // routeAlertTexts returns a map of uppercased route name → alert headline.
@@ -123,6 +128,7 @@ func (h *Handlers) AllStops(w http.ResponseWriter, r *http.Request) {
 	for i, s := range stops {
 		slim[i] = stopResponse{ID: s.ID, Code: s.Code, Name: s.Name}
 	}
+	w.Header().Set("Cache-Control", "public, max-age=3600")
 	respondJSON(w, slim)
 }
 
@@ -141,6 +147,7 @@ func (h *Handlers) Alerts(w http.ResponseWriter, r *http.Request) {
 			RouteNames:  a.RouteNames,
 		}
 	}
+	w.Header().Set("Cache-Control", "public, max-age=30")
 	respondJSON(w, slim)
 }
 
@@ -271,6 +278,7 @@ func (h *Handlers) NetworkHealth(w http.ResponseWriter, r *http.Request) {
 			ActiveTrips: counts[l.code],
 		}
 	}
+	w.Header().Set("Cache-Control", "public, max-age=30")
 	respondJSON(w, result)
 }
 
@@ -304,9 +312,10 @@ func (h *Handlers) Fares(w http.ResponseWriter, r *http.Request) {
 	slim := make([]fareResponse, len(fares))
 	for i, f := range fares {
 		slim[i] = fareResponse{
-			Category: f.Category,
-			FareType: f.FareType,
-			Amount:   f.Amount,
+			Category:   f.Category,
+			FareType:   f.FareType,
+			Amount:     f.Amount,
+			TicketType: f.TicketType,
 		}
 	}
 	respondJSON(w, slim)
