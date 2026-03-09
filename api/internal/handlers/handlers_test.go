@@ -67,8 +67,8 @@ func TestHealthHandler_DegradedWithoutStatic(t *testing.T) {
 
 	h.Health(w, req)
 
-	if w.Code != 200 {
-		t.Fatalf("expected 200, got %d", w.Code)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", w.Code)
 	}
 	var body map[string]string
 	json.Unmarshal(w.Body.Bytes(), &body)
