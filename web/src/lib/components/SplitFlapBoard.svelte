@@ -55,7 +55,7 @@
 			</span>
 
 			<span class="col-route text-white">
-				{#each padRight(dep.isExpress ? dep.line + ' EXP' : dep.line, 10).split('') as char, j}
+				{#each padRight(dep.isExpress ? dep.line + ' EXP' : dep.line, 6).split('') as char, j}
 					<SplitFlapChar value={char} delay={20 + j * 10} />
 				{/each}
 			</span>
@@ -105,7 +105,7 @@
 
 	.board-row {
 		display: grid;
-		grid-template-columns: 8ch 14ch 5ch 8ch 8ch 15ch;
+		grid-template-columns: 8ch 8ch 5ch 8ch 8ch 15ch;
 		gap: 8px;
 		align-items: center;
 		padding: 6px 0;
@@ -167,7 +167,7 @@
 
 	@media (max-width: 480px) {
 		.board-row {
-			grid-template-columns: 7ch 11ch 4ch 7ch 7ch 12ch;
+			grid-template-columns: 7ch 7ch 4ch 7ch 7ch 12ch;
 			gap: 3px;
 		}
 	}
