@@ -107,7 +107,7 @@ var allowedGTFSHosts = map[string]bool{
 	"gtfs.metrolinx.com":     true,
 }
 
-func downloadURL(rawURL string) ([]byte, error) {
+func downloadURL(ctx context.Context, rawURL string) ([]byte, error) {
 	parsed, err := neturl.Parse(rawURL)
 	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") {
 		return nil, fmt.Errorf("invalid or non-HTTP(S) URL: %s", rawURL)
@@ -117,7 +117,11 @@ func downloadURL(rawURL string) ([]byte, error) {
 	}
 	client := &http.Client{Timeout: 60 * time.Second}
 	cleanURL := parsed.String()
-	resp, err := client.Get(cleanURL) //nolint:G107 // URL validated: scheme + hostname allowlist checked above
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cleanURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request for %s: %w", rawURL, err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("downloading %s: %w", rawURL, err)
 	}
@@ -126,7 +130,14 @@ func downloadURL(rawURL string) ([]byte, error) {
 		return nil, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, rawURL)
 	}
 	const maxBytes = 50 * 1024 * 1024 // 50 MB
-	return io.ReadAll(io.LimitReader(resp.Body, maxBytes))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes))
+	if err != nil {
+		return nil, fmt.Errorf("reading response from %s: %w", rawURL, err)
+	}
+	if int64(len(data)) >= maxBytes {
+		return nil, fmt.Errorf("response from %s exceeds %d byte limit", rawURL, maxBytes)
+	}
+	return data, nil
 }
 
 // manageGTFS keeps retrying startup loads until the store becomes ready, then
@@ -159,7 +170,7 @@ func loadGTFSIntoStore(ctx context.Context, url string, maxAttempts int, store *
 		}
 
 		slog.Info("downloading GTFS static data", "url", url, "attempt", attempt, "maxAttempts", maxAttempts)
-		zipData, err := downloadURL(url)
+		zipData, err := downloadURL(ctx, url)
 		if err != nil {
 			slog.Error("failed to download GTFS static data", "error", err, "attempt", attempt)
 			if attempt < maxAttempts {
@@ -214,7 +225,7 @@ func refreshLoop(ctx context.Context, url string, static *gtfsstore.StaticStore,
 			}
 
 			slog.Info("refreshing GTFS static data", "attempt", attempt)
-			data, err := downloadURL(url)
+			data, err := downloadURL(ctx, url)
 			if err != nil {
 				slog.Error("failed to download GTFS refresh", "error", err, "attempt", attempt)
 				if attempt < maxRetries {
