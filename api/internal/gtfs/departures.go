@@ -111,7 +111,7 @@ func GetDepartures(stopCode, destCode string, now time.Time, static *StaticStore
 		delayMin := int(delay.Minutes())
 
 		status := "On Time"
-		if update, ok := rt.GetTripUpdate(c.dep.TripID); ok {
+		if update, ok := findTripUpdate(c.dep.TripID, rt); ok {
 			if update.ScheduleRelationship == "CANCELED" {
 				status = "Cancelled"
 			} else if delayMin >= 1 {
@@ -166,10 +166,19 @@ func GetDepartures(stopCode, destCode string, now time.Time, static *StaticStore
 	return result
 }
 
+// findTripUpdate looks up a trip update by full trip ID first, then by trip number.
+// GTFS static may use a different date-prefix than the RT feed for the same train.
+func findTripUpdate(tripID string, rt *RealtimeCache) (RawTripUpdate, bool) {
+	if update, ok := rt.GetTripUpdate(tripID); ok {
+		return update, true
+	}
+	return rt.GetTripUpdate(extractTripNumber(tripID))
+}
+
 // findDelay returns the departure delay for a trip at a given stop.
 // Returns zero if no update exists.
 func findDelay(tripID, stopID string, rt *RealtimeCache) time.Duration {
-	update, ok := rt.GetTripUpdate(tripID)
+	update, ok := findTripUpdate(tripID, rt)
 	if !ok {
 		return 0
 	}

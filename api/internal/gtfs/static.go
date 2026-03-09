@@ -45,7 +45,7 @@ type StaticStore struct {
 	stopCodes map[string][]string             // stopCode → []stopID (parent + children)
 	services  map[string]gtfs.Service         // serviceID → service
 	tripIndex     map[string]TripInfo             // tripID → TripInfo
-	maxRouteStops map[string]int                  // routeID → max stop count across all trips
+	maxRouteStops map[string]int                  // routeID|firstStop|lastStop → max stop count
 }
 
 // NewStaticStore creates a StaticStore and loads the given GTFS ZIP data.
@@ -186,11 +186,16 @@ func (s *StaticStore) load(zipData []byte) error {
 		}
 	}
 
-	// --- Max stop count per route (for express detection) ---
+	// --- Max stop count per route+endpoint pair (for express detection) ---
+	// Group by route + first/last stop so short-turn trips aren't falsely tagged express.
 	maxRouteStops := make(map[string]int)
 	for _, ti := range tripIndex {
-		if len(ti.Stops) > maxRouteStops[ti.RouteID] {
-			maxRouteStops[ti.RouteID] = len(ti.Stops)
+		if len(ti.Stops) < 2 {
+			continue
+		}
+		key := ti.RouteID + "|" + ti.Stops[0].StopID + "|" + ti.Stops[len(ti.Stops)-1].StopID
+		if len(ti.Stops) > maxRouteStops[key] {
+			maxRouteStops[key] = len(ti.Stops)
 		}
 	}
 
@@ -278,15 +283,17 @@ func (s *StaticStore) RemainingStopNames(tripID string, departureStopIDs []strin
 	return names
 }
 
-// IsExpress returns true if a trip has fewer stops than the maximum for its route.
+// IsExpress returns true if a trip skips stops compared to the longest trip
+// on the same route with the same origin and destination stops.
 func (s *StaticStore) IsExpress(tripID string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	trip, ok := s.tripIndex[tripID]
-	if !ok {
+	if !ok || len(trip.Stops) < 2 {
 		return false
 	}
-	max := s.maxRouteStops[trip.RouteID]
+	key := trip.RouteID + "|" + trip.Stops[0].StopID + "|" + trip.Stops[len(trip.Stops)-1].StopID
+	max := s.maxRouteStops[key]
 	return max > 0 && len(trip.Stops) < max
 }
 

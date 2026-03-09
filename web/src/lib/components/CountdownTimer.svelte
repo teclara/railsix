@@ -2,20 +2,26 @@
 	import { onDestroy } from 'svelte';
 	import { formatCountdown } from '$lib/display';
 
-	let { scheduledTime, size = 'large' }: { scheduledTime: string; size?: 'large' | 'small' } =
-		$props();
+	let {
+		scheduledTime,
+		originalScheduledTime,
+		size = 'large'
+	}: { scheduledTime: string; originalScheduledTime?: string; size?: 'large' | 'small' } = $props();
 
 	let display = $state('--:--');
+	let originalDisplay = $state('');
 
 	let interval: ReturnType<typeof setInterval> | undefined;
 
 	$effect(() => {
-		// Re-run whenever scheduledTime changes
 		const st = scheduledTime;
+		const ost = originalScheduledTime;
 		display = formatCountdown(st);
+		originalDisplay = ost ? formatCountdown(ost) : '';
 		if (interval) clearInterval(interval);
 		interval = setInterval(() => {
 			display = formatCountdown(st);
+			originalDisplay = ost ? formatCountdown(ost) : '';
 		}, 1000);
 	});
 
@@ -36,6 +42,12 @@
 	<span class="time font-mono text-amber-400 tabular-nums" class:time-small={size === 'small'}
 		>{display}</span
 	>
+	{#if size === 'large' && originalDisplay}
+		<div class="scheduled-line">
+			<span class="text-amber-400/60 text-xs uppercase tracking-wider">Scheduled</span>
+			<span class="font-mono text-amber-400/60 tabular-nums text-sm">{originalDisplay}</span>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -48,11 +60,20 @@
 		border-radius: 8px;
 		padding: 12px 24px;
 		min-width: 160px;
+		min-height: 90px;
+		justify-content: center;
 	}
 
 	.time {
 		font-size: 2rem;
 		letter-spacing: 0.1em;
+	}
+
+	.scheduled-line {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-top: 2px;
 	}
 
 	.countdown-small {

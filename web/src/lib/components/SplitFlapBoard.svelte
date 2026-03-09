@@ -16,9 +16,9 @@
 	}
 
 	function boardStatusText(d: Departure): string {
-		if (d.isCancelled || d.status === 'Cancelled') return 'CANCELLED  ';
-		if (d.delayMinutes && d.delayMinutes > 0) return `DELAYED +${d.delayMinutes}MIN`;
-		return 'ON TIME    ';
+		if (d.isCancelled || d.status === 'Cancelled') return 'CANCELLED';
+		if (d.delayMinutes && d.delayMinutes > 0) return `DLY +${d.delayMinutes} MIN`;
+		return 'ON TIME';
 	}
 
 	function boardStatusClass(d: Departure): string {
@@ -67,7 +67,7 @@
 			</span>
 
 			<span class="col-platform text-white">
-				{#each padCenter(compactPlatform(dep.platform ?? 'WAIT'), 7).split('') as char, j}
+				{#each padCenter(compactPlatform(dep.platform ?? 'WAIT'), 5).split('') as char, j}
 					<SplitFlapChar value={char} delay={50 + j * 12} />
 				{/each}
 			</span>
@@ -105,7 +105,7 @@
 
 	.board-row {
 		display: grid;
-		grid-template-columns: 6ch 11ch 4ch 7ch 6ch 12ch;
+		grid-template-columns: 8ch 14ch 5ch 8ch 8ch 15ch;
 		gap: 8px;
 		align-items: center;
 		padding: 6px 0;
@@ -167,7 +167,7 @@
 
 	@media (max-width: 480px) {
 		.board-row {
-			grid-template-columns: 5ch 8ch 3ch 5ch 5ch 9ch;
+			grid-template-columns: 7ch 11ch 4ch 7ch 7ch 12ch;
 			gap: 3px;
 		}
 	}

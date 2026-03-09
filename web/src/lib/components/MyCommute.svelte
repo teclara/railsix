@@ -201,13 +201,12 @@
 		<!-- Countdown -->
 		{#if nextDeparture}
 			<div class="flex flex-col items-center mt-2 gap-1">
-				<CountdownTimer scheduledTime={departureDisplayTime(nextDeparture)} />
-				{#if departureDisplayTime(nextDeparture) !== nextDeparture.scheduledTime}
-					<div class="flex items-center gap-2 text-amber-400/60 text-xs mt-1">
-						<span class="uppercase tracking-wider">Scheduled</span>
-						<CountdownTimer scheduledTime={nextDeparture.scheduledTime} size="small" />
-					</div>
-				{/if}
+				<CountdownTimer
+					scheduledTime={departureDisplayTime(nextDeparture)}
+					originalScheduledTime={departureDisplayTime(nextDeparture) !== nextDeparture.scheduledTime
+						? nextDeparture.scheduledTime
+						: undefined}
+				/>
 				{#if followUpDepartures.length > 0}
 					<div class="flex gap-4 mt-1">
 						{#each followUpDepartures as dep}

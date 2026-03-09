@@ -201,20 +201,9 @@
 		}
 	});
 
-	// Detect express Union departures: fewer stops than the max for that service
-	let maxStopsByService = $derived.by(() => {
-		const map = new Map<string, number>();
-		for (const d of departures) {
-			const count = d.stops?.length ?? 0;
-			const prev = map.get(d.service) ?? 0;
-			if (count > prev) map.set(d.service, count);
-		}
-		return map;
-	});
-
+	// Detect express Union departures: Metrolinx marks them with "Express To" as the first stop
 	function isUnionExpress(dep: UnionDeparture): boolean {
-		const max = maxStopsByService.get(dep.service) ?? 0;
-		return max > 0 && (dep.stops?.length ?? 0) < max;
+		return dep.stops?.[0]?.toLowerCase().startsWith('express') ?? false;
 	}
 
 	type MetaPart = { text: string; cls: string };
@@ -359,7 +348,7 @@
 				</button>
 			{:else}
 				<button
-					class="uppercase tracking-widest text-gray-500 hover:text-gray-300 transition-colors"
+					class="uppercase tracking-widest text-gray-500 hover:text-amber-400 transition-colors"
 					style="font-size: 0.6em;"
 					onclick={() => (dropdownOpen = !dropdownOpen)}
 				>
@@ -430,7 +419,7 @@
 						</span>
 
 						<span class="col-plat text-white">
-							{#each padCenter(dep.platform || '--', 7).split('') as char, j}
+							{#each padCenter(dep.platform || '--', 5).split('') as char, j}
 								<SplitFlapChar value={char} delay={50 + j * 12} />
 							{/each}
 						</span>
@@ -506,7 +495,7 @@
 						</span>
 
 						<span class="col-plat text-white">
-							{#each padCenter(dep.platform || '--', 7).split('') as char, j}
+							{#each padCenter(dep.platform || '--', 5).split('') as char, j}
 								<SplitFlapChar value={char} delay={50 + j * 12} />
 							{/each}
 						</span>
@@ -629,14 +618,14 @@
 
 	.flap-row {
 		display: grid;
-		grid-template-columns: 5ch 1fr 3ch 7ch 7ch;
+		grid-template-columns: 5ch 1fr 3ch 8ch 7ch;
 		gap: 0.4em;
 		align-items: center;
 	}
 
 	.flap-row-station {
 		display: grid;
-		grid-template-columns: 5ch 1fr 3ch 7ch 7ch;
+		grid-template-columns: 5ch 1fr 3ch 8ch 7ch;
 		gap: 0.4em;
 		align-items: center;
 	}
@@ -807,6 +796,9 @@
 
 	/* ── Small screens ── */
 	@media (max-width: 480px) {
+		.fullscreen-btn {
+			display: none;
+		}
 		.board {
 			font-size: clamp(11px, 3.5vw, 18px);
 		}
@@ -825,11 +817,11 @@
 		}
 
 		.flap-row {
-			grid-template-columns: 5ch 1fr 3ch 7ch 7ch;
+			grid-template-columns: 5ch 1fr 3ch 8ch 7ch;
 			gap: 0.3em;
 		}
 		.flap-row-station {
-			grid-template-columns: 5ch 1fr 3ch 7ch 7ch;
+			grid-template-columns: 5ch 1fr 3ch 8ch 7ch;
 			gap: 0.3em;
 		}
 	}
