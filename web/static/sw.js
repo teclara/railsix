@@ -23,6 +23,9 @@ self.addEventListener('fetch', (event) => {
 	// Only handle same-origin requests to prevent open proxy behavior
 	if (url.origin !== self.location.origin) return;
 
+	// Let search engine crawlers fetch these directly
+	if (url.pathname === '/sitemap.xml' || url.pathname === '/robots.txt') return;
+
 	if (url.pathname.startsWith('/api/')) {
 		event.respondWith(
 			// aikido-ignore: same-origin validated on line 24
