@@ -353,7 +353,10 @@
 	</div>
 
 	{#if fetchError}
-		<div class="text-amber-400/70 text-center py-1 tracking-wider uppercase" style="font-size: 0.55em;">
+		<div
+			class="text-amber-400/70 text-center py-1 tracking-wider uppercase"
+			style="font-size: 0.55em;"
+		>
 			Unable to refresh — showing last known data
 		</div>
 	{/if}
