@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+	ApiError,
 	fetchAlerts,
 	fetchDepartures,
 	fetchFares,
@@ -48,10 +49,11 @@ describe('api client helpers', () => {
 		expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/departures/UN?dest=KI%20B');
 	});
 
-	it('returns an empty list when departures fail', async () => {
+	it('throws ApiError when departures fail', async () => {
 		fetchMock.mockResolvedValue(new Response('upstream failed', { status: 502 }));
 
-		await expect(fetchDepartures('UN')).resolves.toEqual([]);
+		await expect(fetchDepartures('UN')).rejects.toThrow(ApiError);
+		await expect(fetchDepartures('UN')).rejects.toMatchObject({ status: 502 });
 	});
 
 	it('fetches fares with both path parameters encoded', async () => {
@@ -67,12 +69,11 @@ describe('api client helpers', () => {
 		expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/fares/UN/BR%26GO');
 	});
 
-	it('returns empty lists for union departures and network health on non-ok responses', async () => {
-		fetchMock
-			.mockResolvedValueOnce(new Response('bad gateway', { status: 502 }))
-			.mockResolvedValueOnce(new Response('bad gateway', { status: 503 }));
+	it('throws ApiError for union departures and network health on non-ok responses', async () => {
+		fetchMock.mockResolvedValueOnce(new Response('bad gateway', { status: 502 }));
+		await expect(fetchUnionDepartures()).rejects.toThrow(ApiError);
 
-		await expect(fetchUnionDepartures()).resolves.toEqual([]);
-		await expect(fetchNetworkHealth()).resolves.toEqual([]);
+		fetchMock.mockResolvedValueOnce(new Response('bad gateway', { status: 503 }));
+		await expect(fetchNetworkHealth()).rejects.toThrow(ApiError);
 	});
 });
