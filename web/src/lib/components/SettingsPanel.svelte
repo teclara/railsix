@@ -3,6 +3,7 @@
 	import { commute, notificationPrefs } from '$lib/stores/commute';
 	import type { CommuteTrip } from '$lib/stores/commute';
 	import type { Stop } from '$lib/api';
+	import { track } from '$lib/track';
 	import StationSearchInput from './StationSearchInput.svelte';
 
 	let { stops, onClose }: { stops: Stop[]; onClose: () => void } = $props();
@@ -21,42 +22,75 @@
 		unsubNotif();
 	});
 
+	function findStopByCode(code: string | undefined): Stop | null {
+		if (!code) return null;
+		return stops.find((s) => s.code === code || s.id === code) ?? null;
+	}
+
 	let workOriginQuery = $state(untrack(() => commuteState.toWork?.originName ?? ''));
 	let workDestQuery = $state(untrack(() => commuteState.toWork?.destinationName ?? ''));
 	let homeOriginQuery = $state(untrack(() => commuteState.toHome?.originName ?? ''));
 	let homeDestQuery = $state(untrack(() => commuteState.toHome?.destinationName ?? ''));
 
-	let workOrigin = $state<Stop | null>(null);
-	let workDest = $state<Stop | null>(null);
-	let homeOrigin = $state<Stop | null>(null);
-	let homeDest = $state<Stop | null>(null);
+	let workOrigin = $state<Stop | null>(
+		untrack(() => findStopByCode(commuteState.toWork?.originCode))
+	);
+	let workDest = $state<Stop | null>(
+		untrack(() => findStopByCode(commuteState.toWork?.destinationCode))
+	);
+	let homeOrigin = $state<Stop | null>(
+		untrack(() => findStopByCode(commuteState.toHome?.originCode))
+	);
+	let homeDest = $state<Stop | null>(
+		untrack(() => findStopByCode(commuteState.toHome?.destinationCode))
+	);
+
+	function tripFromStops(origin: Stop, dest: Stop): CommuteTrip {
+		return {
+			originCode: origin.code || origin.id,
+			originName: origin.name,
+			destinationCode: dest.code || dest.id,
+			destinationName: dest.name
+		};
+	}
 
 	function save() {
 		if (workOrigin && workDest) {
-			commute.setTrip('toWork', {
-				originCode: workOrigin.code || workOrigin.id,
-				originName: workOrigin.name,
-				destinationCode: workDest.code || workDest.id,
-				destinationName: workDest.name
-			});
+			commute.setTrip('toWork', tripFromStops(workOrigin, workDest));
 		}
 		if (homeOrigin && homeDest) {
-			commute.setTrip('toHome', {
-				originCode: homeOrigin.code || homeOrigin.id,
-				originName: homeOrigin.name,
-				destinationCode: homeDest.code || homeDest.id,
-				destinationName: homeDest.name
-			});
+			commute.setTrip('toHome', tripFromStops(homeOrigin, homeDest));
 		}
+		track('settings-save');
 		onClose();
 	}
 
 	function clearAll() {
 		commute.clear();
-		if (typeof localStorage !== 'undefined') {
-			localStorage.removeItem('notificationPrefs');
-		}
+		notificationPrefs.reset();
+		track('settings-clear-all');
 		onClose();
+	}
+
+	async function handleNotificationToggle(enabled: boolean) {
+		if (!enabled) {
+			notificationPrefs.setEnabled(false);
+			return;
+		}
+		if (typeof Notification === 'undefined') {
+			notificationPrefs.setEnabled(false);
+			return;
+		}
+		if (Notification.permission === 'granted') {
+			notificationPrefs.setEnabled(true);
+			return;
+		}
+		if (Notification.permission === 'denied') {
+			notificationPrefs.setEnabled(false);
+			return;
+		}
+		const permission = await Notification.requestPermission();
+		notificationPrefs.setEnabled(permission === 'granted');
 	}
 </script>
 
@@ -127,7 +161,7 @@
 					<input
 						type="checkbox"
 						checked={notifState.enabled}
-						onchange={(e) => notificationPrefs.setEnabled((e.target as HTMLInputElement).checked)}
+						onchange={(e) => handleNotificationToggle((e.target as HTMLInputElement).checked)}
 						class="accent-amber-400"
 					/>
 					<span class="text-white text-sm font-mono">Notify me if delayed</span>

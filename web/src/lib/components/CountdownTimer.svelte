@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
+	import { torontoNow } from '$lib/display';
 
 	let { scheduledTime }: { scheduledTime: string } = $props();
 
 	let display = $state('--:--');
 
 	function computeCountdown(scheduled: string): string {
-		const now = new Date();
 		const [h, m] = scheduled.split(':').map(Number);
-		const target = new Date(now);
-		target.setHours(h, m, 0, 0);
-		if (target < now) target.setDate(target.getDate() + 1);
-		const diffMs = target.getTime() - now.getTime();
-		if (diffMs < 0) return '00:00';
+		const toronto = torontoNow();
+		let targetMs = toronto.todayAt(h, m);
+		const nowMs = toronto.ms;
+		if (targetMs <= nowMs) targetMs += 24 * 3600 * 1000;
+		const diffMs = targetMs - nowMs;
 		const mins = Math.floor(diffMs / 60000);
 		const secs = Math.floor((diffMs % 60000) / 1000);
 		return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;

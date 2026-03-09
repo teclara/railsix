@@ -12,7 +12,7 @@ Real-time GO Transit tracking for Toronto commuters. Split-flap departure board,
 - **Station lookup** — Search any GO station and view upcoming train departures
 - **Real-time data** — Platform assignments, delay status, car counts, occupancy levels, cancellations
 - **Network health** — Active train count per GO line at a glance
-- **Push notifications** — Browser notifications when your train is delayed
+- **Delay alerts** — Browser notifications while Rail Six is open and your train becomes delayed
 - **PWA** — Install on your phone, works offline with service worker
 
 ## Architecture
@@ -54,6 +54,16 @@ npm run dev
 ```
 
 Starts on port 5173.
+
+If you're exposing the Vite dev server through Tunnelmole or another proxy that does not forward
+Vite's HMR websocket, use:
+
+```bash
+cd web
+npm run dev:tunnel
+```
+
+That keeps the site reachable over the tunnel without the repeating websocket errors in the browser.
 
 ## API Endpoints
 

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Stop } from '$lib/api';
 	import { commute } from '$lib/stores/commute';
+	import { track } from '$lib/track';
 	import StationSearchInput from './StationSearchInput.svelte';
 
 	let { stops }: { stops: Stop[] } = $props();
@@ -54,11 +55,15 @@
 			destinationCode: homeDest.code || homeDest.id,
 			destinationName: homeDest.name
 		});
+		track('commute-setup-complete', {
+			workOrigin: workOrigin.name,
+			workDest: workDest.name
+		});
 	}
 </script>
 
-<div class="min-h-screen bg-[#111] flex flex-col items-center justify-center p-6">
-	<div class="w-full max-w-sm">
+<div class="h-[calc(100dvh-60px)] bg-[#111] flex flex-col items-center justify-center p-6">
+	<div class="w-full max-w-sm flex-shrink-0">
 		<h1
 			class="text-amber-400 text-xl font-bold font-mono tracking-widest uppercase text-center mb-2"
 		>
@@ -150,7 +155,7 @@
 		{/if}
 	</div>
 
-	<footer class="pt-8 pb-4 text-center max-w-xs">
+	<footer class="pt-4 pb-2 text-center max-w-xs flex-shrink">
 		<p class="text-gray-500 text-[11px] font-mono leading-relaxed">
 			Real-time GO Transit tracking with live departures, delay alerts, and countdown timers for
 			your daily commute.
@@ -158,7 +163,7 @@
 		<p class="text-gray-600 text-[10px] font-mono mt-3 leading-relaxed text-left">
 			Set up your commute by selecting your origin and destination stations for each direction. Once
 			configured, you'll see live departure times, platform info, and delay notifications. You can
-			also visit the <a href="/board" class="text-amber-400 hover:text-amber-300 transition-colors"
+			also visit the <a href="/departures" class="text-amber-400 hover:text-amber-300 transition-colors"
 				>departure board</a
 			> for a full split-flap display of upcoming trains at any station.
 		</p>

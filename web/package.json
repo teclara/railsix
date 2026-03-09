@@ -4,6 +4,7 @@
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
+		"dev:tunnel": "VITE_DISABLE_HMR=1 vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -30,6 +31,9 @@
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.56.1",
 		"vite": "^6.4.1"
+	},
+	"overrides": {
+		"cookie": "^1.1.1"
 	},
 	"type": "module"
 }

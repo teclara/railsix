@@ -1,7 +1,7 @@
 <script lang="ts">
 	import SplitFlapChar from './SplitFlapChar.svelte';
 	import type { Departure } from '$lib/api-client';
-	import { padRight, padCenter, occupancyIcon, occupancyClass } from '$lib/display';
+	import { padRight, padCenter, compactPlatform } from '$lib/display';
 
 	let {
 		departures = [],
@@ -38,7 +38,6 @@
 		<span class="col-cars text-gray-400">CRS</span>
 		<span class="col-platform text-white">PLT</span>
 		<span class="col-arrival text-amber-300">ARRV</span>
-		<span class="col-occ text-gray-400"></span>
 		<span class="col-status text-gray-400">STATUS</span>
 	</div>
 
@@ -68,7 +67,7 @@
 			</span>
 
 			<span class="col-platform text-white">
-				{#each padCenter(dep.platform ?? '--', 5).split('') as char, j}
+				{#each padCenter(compactPlatform(dep.platform ?? '---'), 5).split('') as char, j}
 					<SplitFlapChar value={char} delay={50 + j * 12} />
 				{/each}
 			</span>
@@ -77,10 +76,6 @@
 				{#each padRight(dep.arrivalTime ?? '-----', 5).split('') as char, j}
 					<SplitFlapChar value={char} delay={60 + j * 10} />
 				{/each}
-			</span>
-
-			<span class="col-occ {occupancyClass(dep.occupancy)}" title={dep.occupancy ?? ''}>
-				{occupancyIcon(dep.occupancy)}
 			</span>
 
 			<span class="col-status {boardStatusClass(dep)}">
@@ -109,7 +104,7 @@
 
 	.board-row {
 		display: grid;
-		grid-template-columns: 5ch 10ch 3ch 5ch 5ch 2ch 11ch;
+		grid-template-columns: 5ch 10ch 3ch 5ch 5ch 11ch;
 		gap: 6px;
 		align-items: center;
 		padding: 4px 0;
@@ -135,7 +130,6 @@
 	.col-cars,
 	.col-platform,
 	.col-arrival,
-	.col-occ,
 	.col-status {
 		display: flex;
 		flex-wrap: nowrap;
@@ -160,10 +154,6 @@
 	.col-arrival {
 		font-size: 0.85em;
 	}
-	.col-occ {
-		font-size: 0.85em;
-		justify-content: center;
-	}
 	.col-status {
 		font-size: 0.8em;
 		letter-spacing: 0.05em;
@@ -176,7 +166,7 @@
 
 	@media (max-width: 480px) {
 		.board-row {
-			grid-template-columns: 5ch 8ch 3ch 5ch 5ch 2ch 9ch;
+			grid-template-columns: 5ch 8ch 3ch 5ch 5ch 9ch;
 			gap: 3px;
 		}
 	}

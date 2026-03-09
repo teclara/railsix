@@ -43,7 +43,8 @@ func mustBuildStore(t *testing.T) *gtfsstore.StaticStore {
 }
 
 func TestHealthHandler(t *testing.T) {
-	h := handlers.New(nil, nil, nil)
+	store := mustBuildStore(t)
+	h := handlers.New(store, nil, nil)
 	req := httptest.NewRequest("GET", "/api/health", nil)
 	w := httptest.NewRecorder()
 
@@ -56,6 +57,23 @@ func TestHealthHandler(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &body)
 	if body["status"] != "ok" {
 		t.Fatalf("expected ok, got %s", body["status"])
+	}
+}
+
+func TestHealthHandler_DegradedWithoutStatic(t *testing.T) {
+	h := handlers.New(nil, nil, nil)
+	req := httptest.NewRequest("GET", "/api/health", nil)
+	w := httptest.NewRecorder()
+
+	h.Health(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var body map[string]string
+	json.Unmarshal(w.Body.Bytes(), &body)
+	if body["status"] != "degraded" {
+		t.Fatalf("expected degraded, got %s", body["status"])
 	}
 }
 

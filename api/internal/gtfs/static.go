@@ -37,6 +37,7 @@ type TripInfo struct {
 
 type StaticStore struct {
 	mu        sync.RWMutex
+	loaded    bool // true once GTFS data has been successfully loaded at least once
 	stops     []models.Stop
 	stopNames map[string]string // stopID → name
 	routes    map[string]models.Route
@@ -46,12 +47,30 @@ type StaticStore struct {
 	tripIndex map[string]TripInfo             // tripID → TripInfo
 }
 
+// NewStaticStore creates a StaticStore and loads the given GTFS ZIP data.
+// Returns a ready store on success.
 func NewStaticStore(zipData []byte) (*StaticStore, error) {
 	s := &StaticStore{}
 	if err := s.load(zipData); err != nil {
 		return nil, err
 	}
 	return s, nil
+}
+
+// NewEmptyStaticStore creates a StaticStore with no data loaded.
+// The store starts in a not-ready state; call Refresh to load data.
+func NewEmptyStaticStore() *StaticStore {
+	return &StaticStore{}
+}
+
+// Ready reports whether the store has been successfully loaded at least once.
+func (s *StaticStore) Ready() bool {
+	if s == nil {
+		return false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.loaded
 }
 
 func (s *StaticStore) load(zipData []byte) error {
@@ -174,6 +193,7 @@ func (s *StaticStore) load(zipData []byte) error {
 	s.stopCodes = stopCodes
 	s.services = services
 	s.tripIndex = tripIndex
+	s.loaded = true
 	s.mu.Unlock()
 
 	slog.Info("GTFS static loaded",

@@ -7,6 +7,8 @@
 	import type { Alert } from '$lib/api';
 	import type { Departure } from '$lib/api-client';
 	import { fetchDepartures, fetchAlerts } from '$lib/api-client';
+	import { torontoHour } from '$lib/display';
+	import { track } from '$lib/track';
 	import { untrack } from 'svelte';
 	import SplitFlapBoard from './SplitFlapBoard.svelte';
 	import CountdownTimer from './CountdownTimer.svelte';
@@ -20,15 +22,17 @@
 	const unsubCommute = commute.subscribe((s) => (commuteState = s));
 
 	let directionOverride = $state<'toWork' | 'toHome' | null>(null);
-	let activeDirection = $derived(getActiveDirection(directionOverride));
-	let activeTrip = $derived(commuteState[activeDirection]);
+	let activeDirection = $derived(getActiveDirection(directionOverride, commuteState));
+	let activeTrip = $derived.by(() =>
+		activeDirection === 'toWork' ? commuteState.toWork : commuteState.toHome
+	);
 
 	let departures = $state<Departure[]>([]);
 	let alerts = $state<Alert[]>(untrack(() => initialAlerts));
 	let showSettings = $state(false);
 
 	function greeting(): string {
-		const h = new Date().getHours();
+		const h = torontoHour();
 		if (h < 12) return 'Good morning';
 		if (h < 17) return 'Good afternoon';
 		return 'Good evening';
@@ -38,19 +42,21 @@
 		return new Date().toLocaleDateString('en-CA', {
 			weekday: 'long',
 			month: 'long',
-			day: 'numeric'
+			day: 'numeric',
+			timeZone: 'America/Toronto'
 		});
 	}
 
 	let nextDeparture = $derived(departures[0] ?? null);
 
-	async function loadDepartures() {
-		if (!activeTrip) {
+	async function loadDepartures(trip = activeTrip) {
+		if (!trip) {
 			departures = [];
 			return;
 		}
 		try {
-			departures = await fetchDepartures(activeTrip.originCode, activeTrip.destinationCode);
+			departures = await fetchDepartures(trip.originCode, trip.destinationCode);
+			checkDelayNotification(departures);
 		} catch {
 			departures = [];
 		}
@@ -67,12 +73,55 @@
 	let departInterval: ReturnType<typeof setInterval>;
 	let alertInterval: ReturnType<typeof setInterval>;
 
+	async function requestNotificationAccess(): Promise<boolean> {
+		if (!browser || !('Notification' in window)) {
+			notificationPrefs.setEnabled(false);
+			return false;
+		}
+		if (Notification.permission === 'granted') {
+			notificationPrefs.setEnabled(true);
+			return true;
+		}
+		if (Notification.permission === 'denied') {
+			notificationPrefs.setEnabled(false);
+			return false;
+		}
+		const permission = await Notification.requestPermission();
+		const enabled = permission === 'granted';
+		notificationPrefs.setEnabled(enabled);
+		return enabled;
+	}
+
+	function syncNotificationAccess() {
+		if (!browser || !('Notification' in window) || Notification.permission !== 'granted') {
+			notificationPrefs.setEnabled(false);
+		}
+	}
+
+	async function showDelayNotification(title: string, body: string) {
+		if (!browser || !('Notification' in window) || Notification.permission !== 'granted') return;
+		if ('serviceWorker' in navigator) {
+			const registration = await navigator.serviceWorker.ready;
+			await registration.showNotification(title, {
+				body,
+				icon: '/icons/icon-192.png',
+				badge: '/icons/icon-192.png',
+				tag: 'delay-alert'
+			});
+			return;
+		}
+		new Notification(title, { body, icon: '/icons/icon-192.png' });
+	}
+
 	onMount(() => {
-		loadDepartures();
+		commute.hydrate();
+		notificationPrefs.hydrate();
+		syncNotificationAccess();
+		mounted = true;
+		// Departures load is handled by the $effect reacting to activeTrip after hydrate.
 		// Alerts are already loaded via SSR (initialAlerts prop) — skip initial fetch.
 		departInterval = setInterval(loadDepartures, 30_000);
 		alertInterval = setInterval(loadAlerts, 60_000);
-		mounted = true;
 	});
 
 	onDestroy(() => {
@@ -83,10 +132,10 @@
 
 	let mounted = $state(false);
 	$effect(() => {
-		// Reload when active trip changes (skip SSR and initial mount — onMount handles that)
-		activeTrip;
+		const trip = activeDirection === 'toWork' ? commuteState.toWork : commuteState.toHome;
 		if (browser && mounted) {
-			loadDepartures();
+			lastNotifiedDelay = null;
+			void loadDepartures(trip);
 		}
 	});
 
@@ -95,23 +144,44 @@
 	let activeRouteNames = $derived<string[]>([]);
 
 	async function requestNotifications() {
-		if (!('Notification' in window)) return;
-		const permission = await Notification.requestPermission();
-		if (permission === 'granted') {
-			notificationPrefs.setEnabled(true);
+		const enabled = await requestNotificationAccess();
+		if (enabled) {
+			track('notifications-enabled');
 		}
 	}
 
-	let notifEnabled = $state(false);
-	const unsubNotif = notificationPrefs.subscribe((s) => (notifEnabled = s.enabled));
+	let notifPrefs = $state({ enabled: false, thresholdMinutes: 5 });
+	let notifEnabled = $derived(notifPrefs.enabled);
+	const unsubNotif = notificationPrefs.subscribe((s) => (notifPrefs = s));
 	onDestroy(() => unsubNotif());
+
+	let lastNotifiedDelay: number | null = null;
+
+	function checkDelayNotification(deps: Departure[]) {
+		if (!notifPrefs.enabled || !deps.length) return;
+		const next = deps[0];
+		const delay = next.delayMinutes ?? 0;
+
+		if (
+			lastNotifiedDelay !== null &&
+			delay > lastNotifiedDelay &&
+			delay >= notifPrefs.thresholdMinutes
+		) {
+			void showDelayNotification(
+				'Rail Six — Delay Alert',
+				`Your ${next.scheduledTime} ${next.line} is now delayed ${delay} min`
+			);
+		}
+
+		lastNotifiedDelay = delay;
+	}
 </script>
 
 {#if !commuteState.toWork && !commuteState.toHome}
 	<CommuteSetup {stops} />
 {:else}
 	<div
-		class="my-commute bg-[#111] min-h-screen text-white font-mono p-4 flex flex-col justify-center gap-4 max-w-lg mx-auto"
+		class="my-commute bg-[#111] h-[calc(100dvh-60px)] text-white font-mono p-4 flex flex-col justify-center gap-4 max-w-lg mx-auto overflow-hidden"
 	>
 		<!-- Header -->
 		<div class="flex items-start justify-between pt-2">
@@ -135,7 +205,10 @@
 				class:bg-amber-400={activeDirection === 'toWork'}
 				class:text-black={activeDirection === 'toWork'}
 				class:text-gray-400={activeDirection !== 'toWork'}
-				onclick={() => (directionOverride = 'toWork')}
+				onclick={() => {
+					directionOverride = 'toWork';
+					track('direction-toggle', { direction: 'toWork' });
+				}}
 				disabled={!commuteState.toWork}
 			>
 				To Work
@@ -145,7 +218,10 @@
 				class:bg-amber-400={activeDirection === 'toHome'}
 				class:text-black={activeDirection === 'toHome'}
 				class:text-gray-400={activeDirection !== 'toHome'}
-				onclick={() => (directionOverride = 'toHome')}
+				onclick={() => {
+					directionOverride = 'toHome';
+					track('direction-toggle', { direction: 'toHome' });
+				}}
 				disabled={!commuteState.toHome}
 			>
 				To Home
@@ -204,7 +280,7 @@
 			</p>
 			<p class="text-gray-600 text-[10px] font-mono mt-3 leading-relaxed text-left">
 				View live departure times, platform info, and delay notifications for your saved commute.
-				Visit the <a href="/board" class="text-amber-400 hover:text-amber-300 transition-colors"
+				Visit the <a href="/departures" class="text-amber-400 hover:text-amber-300 transition-colors"
 					>departure board</a
 				> for a full split-flap display of upcoming trains at any station.
 			</p>

@@ -29,8 +29,7 @@ type Departure struct {
 	RouteColor    string   `json:"routeColor,omitempty"`
 	DelayMinutes  int      `json:"delayMinutes,omitempty"`
 	Stops         []string `json:"stops,omitempty"`
-	Occupancy     string   `json:"occupancy,omitempty"`     // GTFS-RT occupancy status
-	Cars          string   `json:"cars,omitempty"`           // number of coaches
+	Cars         string   `json:"cars,omitempty"` // number of coaches
 	IsInMotion    bool     `json:"isInMotion,omitempty"`
 	IsCancelled   bool     `json:"isCancelled,omitempty"`
 	RouteType     int      `json:"routeType"`
@@ -80,7 +79,6 @@ type ServiceGlanceEntry struct {
 	LineCode   string
 	LineName   string // Display field
 	Cars       string
-	Occupancy  int
 	Lat        float64
 	Lon        float64
 	IsInMotion bool

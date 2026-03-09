@@ -138,15 +138,12 @@ func GetDepartures(stopCode, destCode string, now time.Time, static *StaticStore
 			dep.ArrivalTime = formatTime(c.serviceDay.Add(arrDur))
 		}
 
-		// Enrich with service glance data (occupancy, car count).
+		// Enrich with service glance data (car count, motion status).
 		// GTFS trip ID format: "20260424-LW-1731" → trip number is "1731"
 		tripNumber := extractTripNumber(c.dep.TripID)
 		if sg, ok := rt.GetServiceGlanceEntry(tripNumber); ok {
 			dep.Cars = sg.Cars
 			dep.IsInMotion = sg.IsInMotion
-		}
-		if occStatus := rt.GetOccupancyStatus(c.dep.TripID); occStatus != "" {
-			dep.Occupancy = occStatus
 		}
 
 		// Flag cancelled trips from exceptions cache.

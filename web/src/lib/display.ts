@@ -1,7 +1,43 @@
 import type { Departure } from '$lib/api-client';
 
+const torontoFmt = new Intl.DateTimeFormat('en-CA', {
+	timeZone: 'America/Toronto',
+	hour: 'numeric',
+	minute: 'numeric',
+	second: 'numeric',
+	hour12: false
+});
+
+/** Current hour (0-23) in America/Toronto timezone. */
+export function torontoHour(): number {
+	const parts = torontoFmt.formatToParts(new Date());
+	return Number(parts.find((p) => p.type === 'hour')!.value);
+}
+
+/**
+ * Returns the current time-of-day in America/Toronto as total milliseconds since midnight,
+ * plus a helper to build a "today in Toronto" Date for a given HH:MM schedule time.
+ */
+export function torontoNow(): { ms: number; todayAt: (h: number, m: number) => number } {
+	const parts = torontoFmt.formatToParts(new Date());
+	const get = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+	const hour = get('hour');
+	const minute = get('minute');
+	const second = get('second');
+	const ms = (hour * 3600 + minute * 60 + second) * 1000;
+	return {
+		ms,
+		todayAt: (h: number, m: number) => (h * 3600 + m * 60) * 1000
+	};
+}
+
 export function padRight(str: string, len: number): string {
 	return str.toUpperCase().padEnd(len, ' ').slice(0, len);
+}
+
+/** Compact platform strings like "11 & 12" → "11&12" to fit display width. */
+export function compactPlatform(p: string): string {
+	return p.replace(/\s*&\s*/g, '&');
 }
 
 export function padCenter(str: string, len: number): string {
@@ -20,55 +56,4 @@ export function statusClass(d: Departure): string {
 	if (d.isCancelled) return 'text-red-500';
 	if (d.delayMinutes && d.delayMinutes > 0) return 'text-amber-400';
 	return 'text-green-400';
-}
-
-export function occupancyIcon(status: string | undefined): string {
-	if (!status) return '';
-	switch (status) {
-		case 'MANY_SEATS_AVAILABLE':
-			return '\u25CB';
-		case 'FEW_SEATS_AVAILABLE':
-			return '\u25D1';
-		case 'STANDING_ROOM_ONLY':
-		case 'CRUSHED_STANDING_ROOM_ONLY':
-		case 'FULL':
-			return '\u25CF';
-		default:
-			return '';
-	}
-}
-
-export function occupancyClass(status: string | undefined): string {
-	if (!status) return '';
-	switch (status) {
-		case 'MANY_SEATS_AVAILABLE':
-			return 'text-green-400';
-		case 'FEW_SEATS_AVAILABLE':
-			return 'text-amber-400';
-		case 'STANDING_ROOM_ONLY':
-		case 'CRUSHED_STANDING_ROOM_ONLY':
-		case 'FULL':
-			return 'text-red-400';
-		default:
-			return '';
-	}
-}
-
-export function occupancyLabel(status: string | undefined): { text: string; cls: string } {
-	if (!status) return { text: '', cls: '' };
-	switch (status) {
-		case 'MANY_SEATS_AVAILABLE':
-			return { text: '▪ SEATS AVAIL', cls: 'text-green-400' };
-		case 'FEW_SEATS_AVAILABLE':
-			return { text: '▪▪ FEW SEATS', cls: 'text-amber-400' };
-		case 'STANDING_ROOM_ONLY':
-			return { text: '▪▪▪ STANDING', cls: 'text-amber-400' };
-		case 'CRUSHED_STANDING_ROOM_ONLY':
-		case 'FULL':
-			return { text: '▪▪▪ FULL', cls: 'text-red-400' };
-		case 'NOT_ACCEPTING_PASSENGERS':
-			return { text: '✕ NOT BOARDING', cls: 'text-red-500' };
-		default:
-			return { text: '', cls: '' };
-	}
 }

@@ -21,20 +21,11 @@ import (
 func main() {
 	cfg := config.Load()
 
-	// Download and parse GTFS static data
-	slog.Info("downloading GTFS static data", "url", cfg.GTFSStaticURL)
-	zipData, err := downloadURL(cfg.GTFSStaticURL)
-	if err != nil {
-		slog.Error("failed to download GTFS static data", "error", err)
-		os.Exit(1)
-	}
-	static, err := gtfsstore.NewStaticStore(zipData)
-	if err != nil {
-		slog.Error("failed to parse GTFS static data", "error", err)
-		os.Exit(1)
-	}
+	// Try to download and parse GTFS static data with retries.
+	// If all attempts fail, start in degraded mode (departures unavailable).
+	static := loadGTFSWithRetries(cfg.GTFSStaticURL, 5)
 
-	// Start daily GTFS refresh
+	// Start background GTFS refresh loop (also retries on failure).
 	go refreshLoop(cfg.GTFSStaticURL, static, 24*time.Hour)
 
 	// Realtime cache + background pollers
@@ -60,7 +51,6 @@ func main() {
 			gtfsstore.StartServiceGlancePoller(ctx, mxClient, rtCache, 30*time.Second)
 			gtfsstore.StartExceptionsPoller(ctx, mxClient, rtCache, 60*time.Second)
 			gtfsstore.StartUnionDeparturesPoller(ctx, mxClient, rtCache, 30*time.Second)
-			gtfsstore.StartOccupancyPoller(ctx, mxClient, rtCache, 30*time.Second)
 		}
 	}
 
@@ -123,18 +113,75 @@ func downloadURL(rawURL string) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(resp.Body, maxBytes))
 }
 
+// loadGTFSWithRetries attempts to download and parse GTFS data with exponential backoff.
+// If all attempts fail, returns an empty store so the API can start in degraded mode.
+func loadGTFSWithRetries(url string, maxAttempts int) *gtfsstore.StaticStore {
+	backoff := 2 * time.Second
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		slog.Info("downloading GTFS static data", "url", url, "attempt", attempt, "maxAttempts", maxAttempts)
+		zipData, err := downloadURL(url)
+		if err != nil {
+			slog.Error("failed to download GTFS static data", "error", err, "attempt", attempt)
+			if attempt < maxAttempts {
+				slog.Info("retrying GTFS download", "backoff", backoff)
+				time.Sleep(backoff)
+				backoff *= 2
+				continue
+			}
+			slog.Warn("all GTFS download attempts failed, starting in degraded mode")
+			return gtfsstore.NewEmptyStaticStore()
+		}
+		store, err := gtfsstore.NewStaticStore(zipData)
+		if err != nil {
+			slog.Error("failed to parse GTFS static data", "error", err, "attempt", attempt)
+			if attempt < maxAttempts {
+				slog.Info("retrying GTFS download", "backoff", backoff)
+				time.Sleep(backoff)
+				backoff *= 2
+				continue
+			}
+			slog.Warn("all GTFS parse attempts failed, starting in degraded mode")
+			return gtfsstore.NewEmptyStaticStore()
+		}
+		return store
+	}
+	// Unreachable, but satisfy the compiler.
+	return gtfsstore.NewEmptyStaticStore()
+}
+
+// refreshLoop periodically re-downloads GTFS static data. On failure it retries
+// with exponential backoff (up to 3 attempts) before waiting for the next interval.
 func refreshLoop(url string, static *gtfsstore.StaticStore, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
-		slog.Info("refreshing GTFS static data")
-		data, err := downloadURL(url)
-		if err != nil {
-			slog.Error("failed to download GTFS refresh", "error", err)
-			continue
+		const maxRetries = 3
+		backoff := 5 * time.Second
+		var refreshed bool
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			slog.Info("refreshing GTFS static data", "attempt", attempt)
+			data, err := downloadURL(url)
+			if err != nil {
+				slog.Error("failed to download GTFS refresh", "error", err, "attempt", attempt)
+				if attempt < maxRetries {
+					time.Sleep(backoff)
+					backoff *= 2
+				}
+				continue
+			}
+			if err := static.Refresh(data); err != nil {
+				slog.Error("failed to parse GTFS refresh", "error", err, "attempt", attempt)
+				if attempt < maxRetries {
+					time.Sleep(backoff)
+					backoff *= 2
+				}
+				continue
+			}
+			refreshed = true
+			break
 		}
-		if err := static.Refresh(data); err != nil {
-			slog.Error("failed to parse GTFS refresh", "error", err)
+		if !refreshed {
+			slog.Warn("GTFS refresh failed after all retries, will try again next interval")
 		}
 	}
 }

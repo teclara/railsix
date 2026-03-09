@@ -66,7 +66,6 @@ Started in `main.go` when `METROLINX_API_KEY` is configured:
 - **ServiceGlancePoller** (30s) — Metrolinx ServiceGlance API for cars count, isInMotion, lat/lon
 - **ExceptionsPoller** (60s) — Metrolinx service exceptions (cancelled trips)
 - **UnionDeparturesPoller** (30s) — Metrolinx Union Station departure board
-- **OccupancyPoller** (30s) — GTFS-RT VehiclePosition feed for occupancy status strings
 
 ### Middleware
 - **CORS** — allows configured origins, GET + OPTIONS methods

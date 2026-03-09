@@ -27,6 +27,11 @@ func New(static *gtfsstore.StaticStore, rt *gtfsstore.RealtimeCache, mx *metroli
 
 func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	if !h.static.Ready() {
+		w.WriteHeader(http.StatusOK) // still pass health checks so the service stays up
+		w.Write([]byte(`{"status":"degraded","reason":"GTFS static data unavailable"}`))
+		return
+	}
 	w.Write([]byte(`{"status":"ok"}`))
 }
 
@@ -78,8 +83,7 @@ type departureResponse struct {
 	Platform      string   `json:"platform,omitempty"`
 	DelayMinutes  int      `json:"delayMinutes,omitempty"`
 	Stops         []string `json:"stops,omitempty"`
-	Occupancy     string   `json:"occupancy,omitempty"`
-	Cars          string   `json:"cars,omitempty"`
+	Cars         string   `json:"cars,omitempty"`
 	IsInMotion    bool     `json:"isInMotion,omitempty"`
 	IsCancelled   bool     `json:"isCancelled,omitempty"`
 	Alert         string   `json:"alert,omitempty"`
@@ -93,7 +97,6 @@ type unionDepartureResponse struct {
 	Info        string   `json:"info"`
 	Stops       []string `json:"stops"`
 	Cars        string   `json:"cars,omitempty"`
-	Occupancy   string   `json:"occupancy,omitempty"`
 	IsInMotion  bool     `json:"isInMotion,omitempty"`
 	IsCancelled bool     `json:"isCancelled,omitempty"`
 	Alert       string   `json:"alert,omitempty"`
@@ -123,6 +126,10 @@ func (h *Handlers) routeAlertTexts() map[string]string {
 
 // AllStops serves stops from GTFS static data (slim: no lat/lon/parentId).
 func (h *Handlers) AllStops(w http.ResponseWriter, r *http.Request) {
+	if !h.static.Ready() {
+		jsonError(w, "GTFS static data is unavailable, please try again later", http.StatusServiceUnavailable)
+		return
+	}
 	stops := h.static.AllStops()
 	slim := make([]stopResponse, len(stops))
 	for i, s := range stops {
@@ -158,6 +165,10 @@ func (h *Handlers) StopDepartures(w http.ResponseWriter, r *http.Request) {
 	stopCode := r.PathValue("stopCode")
 	if !stopCodeRe.MatchString(stopCode) {
 		jsonError(w, "invalid stop code", http.StatusBadRequest)
+		return
+	}
+	if !h.static.Ready() {
+		jsonError(w, "GTFS static data is unavailable, please try again later", http.StatusServiceUnavailable)
 		return
 	}
 	destCode := r.URL.Query().Get("dest")
@@ -211,7 +222,6 @@ func (h *Handlers) StopDepartures(w http.ResponseWriter, r *http.Request) {
 			Platform:      d.Platform,
 			DelayMinutes:  d.DelayMinutes,
 			Stops:         d.Stops,
-			Occupancy:     d.Occupancy,
 			Cars:          d.Cars,
 			IsInMotion:    d.IsInMotion,
 			IsCancelled:   d.IsCancelled,
@@ -343,9 +353,6 @@ func (h *Handlers) UnionDepartures(w http.ResponseWriter, r *http.Request) {
 		if sg, ok := h.rt.GetServiceGlanceEntry(d.TripNumber); ok {
 			slim[i].Cars = sg.Cars
 			slim[i].IsInMotion = sg.IsInMotion
-		}
-		if occ := h.rt.GetOccupancyByTripNumber(d.TripNumber); occ != "" {
-			slim[i].Occupancy = occ
 		}
 		if h.rt.IsTripCancelled(d.TripNumber) {
 			slim[i].IsCancelled = true

@@ -1,6 +1,7 @@
 // web/src/lib/stores/commute.ts
 import { browser } from '$app/environment';
 import { writable } from 'svelte/store';
+import { torontoHour } from '$lib/display';
 
 export interface CommuteTrip {
 	originCode: string;
@@ -30,14 +31,18 @@ function safeParse<T>(key: string, fallback: T): T {
 }
 
 function createCommuteStore() {
-	const initial: CommuteStore = browser
-		? (safeParse<CommuteStore | null>('commute', null) ?? { toWork: null, toHome: null })
-		: { toWork: null, toHome: null };
-
-	const { subscribe, set, update } = writable<CommuteStore>(initial);
+	const empty: CommuteStore = { toWork: null, toHome: null };
+	const { subscribe, set, update } = writable<CommuteStore>(empty);
 
 	return {
 		subscribe,
+		/** Call once from onMount to load saved state from localStorage */
+		hydrate() {
+			if (browser) {
+				const saved = safeParse<CommuteStore | null>('commute', null);
+				if (saved) set(saved);
+			}
+		},
 		setTrip(direction: 'toWork' | 'toHome', trip: CommuteTrip) {
 			update((s) => {
 				const next = { ...s, [direction]: trip };
@@ -46,7 +51,6 @@ function createCommuteStore() {
 			});
 		},
 		clear() {
-			const empty = { toWork: null, toHome: null };
 			if (browser) localStorage.removeItem('commute');
 			set(empty);
 		}
@@ -54,17 +58,18 @@ function createCommuteStore() {
 }
 
 function createNotificationStore() {
-	const initial: NotificationPrefs = browser
-		? (safeParse<NotificationPrefs | null>('notificationPrefs', null) ?? {
-				enabled: false,
-				thresholdMinutes: 5
-			})
-		: { enabled: false, thresholdMinutes: 5 };
-
-	const { subscribe, update } = writable<NotificationPrefs>(initial);
+	const defaults: NotificationPrefs = { enabled: false, thresholdMinutes: 5 };
+	const { subscribe, update, set } = writable<NotificationPrefs>(defaults);
 
 	return {
 		subscribe,
+		/** Call once from onMount to load saved state from localStorage */
+		hydrate() {
+			if (browser) {
+				const saved = safeParse<NotificationPrefs | null>('notificationPrefs', null);
+				if (saved) set(saved);
+			}
+		},
 		setEnabled(enabled: boolean) {
 			update((s) => {
 				const next = { ...s, enabled };
@@ -78,6 +83,10 @@ function createNotificationStore() {
 				if (browser) localStorage.setItem('notificationPrefs', JSON.stringify(next));
 				return next;
 			});
+		},
+		reset() {
+			if (browser) localStorage.removeItem('notificationPrefs');
+			set(defaults);
 		}
 	};
 }
@@ -86,7 +95,20 @@ export const commute = createCommuteStore();
 export const notificationPrefs = createNotificationStore();
 
 /** Returns which direction to show based on time of day, respecting manual override */
-export function getActiveDirection(override: 'toWork' | 'toHome' | null): 'toWork' | 'toHome' {
+export function getActiveDirection(
+	override: 'toWork' | 'toHome' | null,
+	commuteState?: CommuteStore
+): 'toWork' | 'toHome' {
 	if (override) return override;
-	return new Date().getHours() < 12 ? 'toWork' : 'toHome';
+
+	const preferWork = torontoHour() < 12;
+	if (!commuteState?.toWork && !commuteState?.toHome) {
+		return preferWork ? 'toWork' : 'toHome';
+	}
+
+	if (preferWork) {
+		return commuteState?.toWork ? 'toWork' : 'toHome';
+	}
+
+	return commuteState?.toHome ? 'toHome' : 'toWork';
 }
