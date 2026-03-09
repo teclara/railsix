@@ -179,10 +179,11 @@
 		.split-flap-board {
 			font-size: 11px;
 			padding: 8px;
+			width: 100%;
 		}
 
 		.board-row {
-			grid-template-columns: 6ch 5ch 4ch 6ch 6ch 11ch;
+			grid-template-columns: 6ch 5ch 4ch 6ch 6ch 1fr;
 			gap: 2px;
 		}
 	}
