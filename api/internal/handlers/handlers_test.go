@@ -44,7 +44,8 @@ func mustBuildStore(t *testing.T) *gtfsstore.StaticStore {
 
 func TestHealthHandler(t *testing.T) {
 	store := mustBuildStore(t)
-	h := handlers.New(store, nil, nil)
+	rt := gtfsstore.NewRealtimeCache()
+	h := handlers.New(store, rt, nil)
 	req := httptest.NewRequest("GET", "/api/health", nil)
 	w := httptest.NewRecorder()
 
@@ -53,10 +54,13 @@ func TestHealthHandler(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var body map[string]string
+	var body map[string]any
 	json.Unmarshal(w.Body.Bytes(), &body)
 	if body["status"] != "ok" {
 		t.Fatalf("expected ok, got %s", body["status"])
+	}
+	if _, ok := body["cache"]; !ok {
+		t.Fatal("expected cache field in health response")
 	}
 }
 

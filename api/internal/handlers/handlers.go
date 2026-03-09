@@ -32,7 +32,23 @@ func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
 			[]byte(`{"status":"starting","reason":"GTFS static data loading"}`))
 		return
 	}
-	writeJSON(w, http.StatusOK, []byte(`{"status":"ok"}`))
+	status := h.rt.Status()
+	resp := struct {
+		Status string                `json:"status"`
+		Cache  gtfsstore.CacheStatus `json:"cache"`
+	}{
+		Status: "ok",
+		Cache:  status,
+	}
+	if status.Stale {
+		resp.Status = "degraded"
+	}
+	data, err := json.Marshal(resp)
+	if err != nil {
+		writeJSON(w, http.StatusOK, []byte(`{"status":"ok"}`))
+		return
+	}
+	writeJSON(w, http.StatusOK, data)
 }
 
 func (h *Handlers) Ready(w http.ResponseWriter, r *http.Request) {
