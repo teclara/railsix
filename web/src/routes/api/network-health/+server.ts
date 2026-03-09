@@ -5,7 +5,8 @@ export async function GET() {
 	try {
 		const lines = await getNetworkHealth();
 		return json(lines);
-	} catch {
-		return json([], { status: 502 });
+	} catch (err) {
+		console.error('[proxy] /api/network-health failed:', err);
+		return json({ error: 'upstream unavailable' }, { status: 502 });
 	}
 }

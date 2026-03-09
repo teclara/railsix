@@ -5,7 +5,8 @@ export async function GET() {
 	try {
 		const stops = await getAllStops();
 		return json(stops);
-	} catch {
-		return json([], { status: 502 });
+	} catch (err) {
+		console.error('[proxy] /api/stops failed:', err);
+		return json({ error: 'upstream unavailable' }, { status: 502 });
 	}
 }

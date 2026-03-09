@@ -5,7 +5,8 @@ export async function GET() {
 	try {
 		const departures = await getUnionDepartures();
 		return json(departures);
-	} catch {
-		return json([], { status: 502 });
+	} catch (err) {
+		console.error('[proxy] /api/union-departures failed:', err);
+		return json({ error: 'upstream unavailable' }, { status: 502 });
 	}
 }

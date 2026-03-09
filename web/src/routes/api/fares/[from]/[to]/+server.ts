@@ -11,7 +11,8 @@ export const GET: RequestHandler = async ({ params }) => {
 	try {
 		const fares = await getFares(params.from, params.to);
 		return json(fares);
-	} catch {
-		return json([], { status: 502 });
+	} catch (err) {
+		console.error('[proxy] /api/fares failed:', err);
+		return json({ error: 'upstream unavailable' }, { status: 502 });
 	}
 };
