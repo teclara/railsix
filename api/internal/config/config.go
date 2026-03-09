@@ -3,6 +3,7 @@ package config
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,5 +90,8 @@ func loadDotEnvFile(path string, env map[string]string) {
 		if key != "" {
 			env[key] = value
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: error reading %s: %v\n", path, err)
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -61,7 +62,7 @@ func TestCORSMiddleware_OptionsRequestShortCircuits(t *testing.T) {
 func TestDownloadURL_RejectsInvalidScheme(t *testing.T) {
 	t.Parallel()
 
-	_, err := downloadURL("ftp://assets.metrolinx.com/GO-GTFS.zip")
+	_, err := downloadURL(context.Background(), "ftp://assets.metrolinx.com/GO-GTFS.zip")
 	if err == nil {
 		t.Fatal("expected invalid scheme to fail")
 	}
@@ -73,7 +74,7 @@ func TestDownloadURL_RejectsInvalidScheme(t *testing.T) {
 func TestDownloadURL_RejectsDisallowedHost(t *testing.T) {
 	t.Parallel()
 
-	_, err := downloadURL("https://example.com/GO-GTFS.zip")
+	_, err := downloadURL(context.Background(), "https://example.com/GO-GTFS.zip")
 	if err == nil {
 		t.Fatal("expected disallowed host to fail")
 	}
