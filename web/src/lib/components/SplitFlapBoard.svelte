@@ -3,6 +3,8 @@
 	import type { Departure } from '$lib/api-client';
 	import { padRight, padCenter, compactPlatform, departureDisplayTime } from '$lib/display';
 
+	import { onMount } from 'svelte';
+
 	let {
 		departures = [],
 		maxRows = 3
@@ -10,6 +12,14 @@
 		departures: Departure[];
 		maxRows?: number;
 	} = $props();
+
+	let isMobile = $state(false);
+
+	onMount(() => {
+		const mq = window.matchMedia('(max-width: 480px)');
+		isMobile = mq.matches;
+		mq.addEventListener('change', (e) => (isMobile = e.matches));
+	});
 
 	function formatTime(t: string): string {
 		return t.slice(0, 5);
@@ -55,7 +65,7 @@
 			</span>
 
 			<span class="col-route text-white">
-				{#each padRight(dep.isExpress ? dep.line + ' EXP' : dep.line, 6).split('') as char, j}
+				{#each padRight(dep.isExpress ? dep.line + ' E' : dep.line, isMobile ? 4 : 6).split('') as char, j}
 					<SplitFlapChar value={char} delay={20 + j * 10} />
 				{/each}
 			</span>
@@ -167,7 +177,7 @@
 
 	@media (max-width: 480px) {
 		.board-row {
-			grid-template-columns: 7ch 7ch 4ch 7ch 7ch 12ch;
+			grid-template-columns: 7ch 5ch 4ch 7ch 7ch 12ch;
 			gap: 3px;
 		}
 	}
