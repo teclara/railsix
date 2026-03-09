@@ -28,12 +28,17 @@
 	function boardStatusText(d: Departure): string {
 		if (d.isCancelled || d.status === 'Cancelled') return 'CANCELLED';
 		if (d.delayMinutes && d.delayMinutes > 0) return `DLY +${d.delayMinutes} MIN`;
+		const s = d.status?.toUpperCase() ?? '';
+		if (s === 'PROCEED' || s === 'WAIT') return s;
 		return 'ON TIME';
 	}
 
 	function boardStatusClass(d: Departure): string {
 		if (d.isCancelled || d.status === 'Cancelled') return 'text-red-500';
 		if (d.delayMinutes && d.delayMinutes > 0) return 'text-amber-400';
+		const s = d.status?.toUpperCase() ?? '';
+		if (s === 'PROCEED') return 'text-green-400';
+		if (s === 'WAIT') return 'text-amber-300';
 		return 'text-green-400';
 	}
 

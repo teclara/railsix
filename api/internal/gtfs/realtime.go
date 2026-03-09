@@ -251,6 +251,18 @@ func (rc *RealtimeCache) GetUnionDepartures() []models.UnionDeparture {
 	return out
 }
 
+// GetUnionDepartureByTrip returns the Union departure board entry for a trip number, if available.
+func (rc *RealtimeCache) GetUnionDepartureByTrip(tripNumber string) (models.UnionDeparture, bool) {
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
+	for _, ud := range rc.unionDepartures {
+		if ud.TripNumber == tripNumber {
+			return ud, true
+		}
+	}
+	return models.UnionDeparture{}, false
+}
+
 // --- Staleness tracking ---
 
 const maxCacheAge = 5 * time.Minute

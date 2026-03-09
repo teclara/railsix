@@ -154,6 +154,16 @@ func GetDepartures(stopCode, destCode string, now time.Time, static *StaticStore
 			dep.IsInMotion = sg.IsInMotion
 		}
 
+		// Enrich with Union departures board info (platform, proceed/wait status).
+		if ud, ok := rt.GetUnionDepartureByTrip(tripNumber); ok {
+			if ud.Platform != "" && dep.Platform == "" {
+				dep.Platform = ud.Platform
+			}
+			if ud.Info != "" {
+				dep.Status = ud.Info
+			}
+		}
+
 		// Flag cancelled trips from exceptions cache.
 		if rt.IsTripCancelled(tripNumber) {
 			dep.IsCancelled = true
