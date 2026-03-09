@@ -176,9 +176,14 @@
 	}
 
 	@media (max-width: 480px) {
+		.split-flap-board {
+			font-size: 11px;
+			padding: 8px;
+		}
+
 		.board-row {
-			grid-template-columns: 7ch 5ch 4ch 7ch 7ch 12ch;
-			gap: 3px;
+			grid-template-columns: 6ch 5ch 4ch 6ch 6ch 11ch;
+			gap: 2px;
 		}
 	}
 </style>
