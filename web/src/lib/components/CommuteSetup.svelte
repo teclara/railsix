@@ -162,8 +162,8 @@
 		</p>
 		<p class="text-gray-500 text-[10px] font-mono mt-3 leading-relaxed text-center">
 			Set up your commute by selecting your origin and destination stations for each direction. Once
-			configured, you'll see live departure times, platform info, and delay updates. You can
-			also visit the <a href="/departures" class="text-amber-400 hover:text-amber-300 transition-colors"
+			configured, you'll see live departure times, platform info, and delay updates. You can also
+			visit the <a href="/departures" class="text-amber-400 hover:text-amber-300 transition-colors"
 				>departure board</a
 			> for a full split-flap display of upcoming trains at any station.
 		</p>

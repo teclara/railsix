@@ -195,7 +195,11 @@
 
 	type MetaPart = { text: string; cls: string };
 
-	function buildMetaParts(dep: { isInMotion?: boolean; alert?: string; stops?: string[] }): MetaPart[] {
+	function buildMetaParts(dep: {
+		isInMotion?: boolean;
+		alert?: string;
+		stops?: string[];
+	}): MetaPart[] {
 		const parts: MetaPart[] = [];
 		if (dep.isInMotion) parts.push({ text: 'EN ROUTE', cls: 'text-green-400' });
 		if (dep.stops && dep.stops.length > 0)
@@ -455,7 +459,11 @@
 								<SplitFlapChar value={char} delay={20 + j * 10} />
 							{/each}
 							{#if dep.stops && dep.stops.length > 0}
-								<span class="direction-tag {dep.stops.some((s) => s.toUpperCase().includes('UNION')) ? 'text-green-400' : 'text-purple-400'}">TO {dep.stops[dep.stops.length - 1].toUpperCase()}</span>
+								<span
+									class="direction-tag {dep.stops.some((s) => s.toUpperCase().includes('UNION'))
+										? 'text-green-400'
+										: 'text-purple-400'}">TO {dep.stops[dep.stops.length - 1].toUpperCase()}</span
+								>
 							{/if}
 							{#if dep.alert}<span class="alert-inline">! {dep.alert.toUpperCase()}</span>{/if}
 						</span>

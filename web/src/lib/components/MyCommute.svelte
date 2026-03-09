@@ -98,7 +98,6 @@
 	// Pass empty array — AlertBanner shows all alerts when no route filter is provided
 	// TODO: store route names in commute trips to enable route-specific filtering
 	let activeRouteNames = $derived<string[]>([]);
-
 </script>
 
 {#if !commuteState.toWork && !commuteState.toHome}
@@ -189,8 +188,8 @@
 				your daily commute.
 			</p>
 			<p class="text-gray-500 text-[10px] font-mono mt-3 leading-relaxed text-center">
-				View live departure times, platform info, and delay updates for your saved commute.
-				Visit the <a href="/departures" class="text-amber-400 hover:text-amber-300 transition-colors"
+				View live departure times, platform info, and delay updates for your saved commute. Visit
+				the <a href="/departures" class="text-amber-400 hover:text-amber-300 transition-colors"
 					>departure board</a
 				> for a full split-flap display of upcoming trains at any station.
 			</p>
