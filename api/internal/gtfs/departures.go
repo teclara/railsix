@@ -21,7 +21,7 @@ const (
 func GetDepartures(stopCode, destCode string, now time.Time, static *StaticStore, rt *RealtimeCache) []models.Departure {
 	loc, err := time.LoadLocation(torontoTZ)
 	if err != nil {
-		loc = time.UTC
+		panic("failed to load America/Toronto timezone: " + err.Error())
 	}
 	nowLocal := now.In(loc)
 
