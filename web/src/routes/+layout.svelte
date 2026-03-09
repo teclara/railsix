@@ -111,7 +111,7 @@
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 	<meta name="apple-mobile-web-app-title" content="Rail Six" />
 	<link rel="manifest" href="/manifest.json" />
-	<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
 	<link rel="canonical" href="https://railsix.com{path}" />
 	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 	{@html '<script defer src="https://umami.teclara.cloud/script.js" data-website-id="6272cae6-97eb-42a9-bf71-f3b1f2a094f2"><' +
