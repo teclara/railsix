@@ -67,6 +67,7 @@
 	}
 
 	let allGtfsDepartures = $state<Departure[]>([]);
+	let fetchError = $state(false);
 
 	let trainDepartures = $derived(
 		allGtfsDepartures.filter((d) => d.routeType !== 3).slice(0, isFullscreen ? 10 : 15)
@@ -84,8 +85,11 @@
 			const deps = await fetchDepartures(stopCode);
 			if (controller.signal.aborted) return;
 			allGtfsDepartures = sortByScheduledTime(deps);
-		} catch {
-			// Ignore abort errors and fetch failures
+			fetchError = false;
+		} catch (err) {
+			if (controller.signal.aborted) return;
+			fetchError = true;
+			console.error('Failed to load departures:', err);
 		}
 	}
 
@@ -108,8 +112,8 @@
 	async function loadNetworkHealth() {
 		try {
 			networkHealth = await fetchNetworkHealth();
-		} catch {
-			// keep existing data on error
+		} catch (err) {
+			console.error('Failed to load network health:', err);
 		}
 	}
 
@@ -347,6 +351,12 @@
 		<span class="col-plat text-white">PLT</span>
 		<span class="col-status text-gray-400">STATUS</span>
 	</div>
+
+	{#if fetchError}
+		<div class="text-amber-400/70 text-center py-1 tracking-wider uppercase" style="font-size: 0.55em;">
+			Unable to refresh — showing last known data
+		</div>
+	{/if}
 
 	<div class="rows">
 		{#each trainDepartures as dep}
