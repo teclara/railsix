@@ -213,7 +213,15 @@
 		requestAnimationFrame(update);
 		const ro = new ResizeObserver(update);
 		ro.observe(node);
-		return { destroy: () => ro.disconnect() };
+		// Re-check when content changes (stops may render after action mounts)
+		const mo = new MutationObserver(() => requestAnimationFrame(update));
+		mo.observe(inner, { childList: true, characterData: true, subtree: true });
+		return {
+			destroy: () => {
+				ro.disconnect();
+				mo.disconnect();
+			}
+		};
 	}
 </script>
 
@@ -560,15 +568,15 @@
 	}
 	.col-plat {
 		font-size: 0.85em;
-		justify-content: center;
-		padding-right: 0.3em;
+		justify-content: flex-end;
 	}
 	.col-cars {
 		font-size: 0.8em;
-		justify-content: center;
+		justify-content: flex-end;
 	}
 	.col-status {
 		font-size: 0.8em;
+		justify-content: flex-end;
 	}
 
 	.departure-row {
