@@ -129,6 +129,7 @@ func GetDepartures(stopCode, destCode string, now time.Time, static *StaticStore
 			Destination:   c.dep.Headsign,
 			ScheduledTime: formatTime(c.serviceDay.Add(c.dep.DepartureTime)),
 			Status:        status,
+			Platform:      extractPlatform(static.GetStopName(c.stopID)),
 			RouteColor:    route.Color,
 			DelayMinutes:  delayMin,
 			Stops:         static.RemainingStopNames(c.dep.TripID, stopIDs),
@@ -222,6 +223,16 @@ func extractTripNumber(tripID string) string {
 		return tripID[idx+1:]
 	}
 	return tripID
+}
+
+// extractPlatform extracts the platform number from a GTFS stop name.
+// e.g. "Oakville GO Platform 1" → "1", "Union Station Platform 12" → "12"
+func extractPlatform(stopName string) string {
+	const prefix = "Platform "
+	if idx := strings.LastIndex(stopName, prefix); idx >= 0 {
+		return stopName[idx+len(prefix):]
+	}
+	return ""
 }
 
 // formatTime returns "HH:MM" in local time.
