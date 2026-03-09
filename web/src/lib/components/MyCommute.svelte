@@ -7,7 +7,7 @@
 	import type { Alert } from '$lib/api';
 	import type { Departure } from '$lib/api-client';
 	import { fetchDepartures, fetchAlerts } from '$lib/api-client';
-	import { torontoHour } from '$lib/display';
+	import { torontoHour, torontoNow } from '$lib/display';
 	import { track } from '$lib/track';
 	import { untrack } from 'svelte';
 	import SplitFlapBoard from './SplitFlapBoard.svelte';
@@ -47,7 +47,15 @@
 		});
 	}
 
-	let nextDeparture = $derived(departures[0] ?? null);
+	let tick = $state(0);
+	let nextDeparture = $derived.by(() => {
+		tick; // re-evaluate each tick
+		const now = torontoNow();
+		return departures.find((d) => {
+			const [h, m] = d.scheduledTime.split(':').map(Number);
+			return now.todayAt(h, m) > now.ms;
+		}) ?? null;
+	});
 
 	async function loadDepartures(trip = activeTrip) {
 		if (!trip) {
@@ -71,6 +79,7 @@
 
 	let departInterval: ReturnType<typeof setInterval>;
 	let alertInterval: ReturnType<typeof setInterval>;
+	let tickInterval: ReturnType<typeof setInterval>;
 
 	onMount(() => {
 		commute.hydrate();
@@ -79,11 +88,13 @@
 		// Alerts are already loaded via SSR (initialAlerts prop) — skip initial fetch.
 		departInterval = setInterval(loadDepartures, 30_000);
 		alertInterval = setInterval(loadAlerts, 60_000);
+		tickInterval = setInterval(() => (tick += 1), 1000);
 	});
 
 	onDestroy(() => {
 		clearInterval(departInterval);
 		clearInterval(alertInterval);
+		clearInterval(tickInterval);
 		unsubCommute();
 	});
 
@@ -93,6 +104,15 @@
 		if (browser && mounted) {
 			void loadDepartures(trip);
 		}
+	});
+
+	// When all departures have passed, fetch fresh data immediately
+	let prevNext: Departure | null = null;
+	$effect(() => {
+		if (prevNext && !nextDeparture && activeTrip) {
+			void loadDepartures();
+		}
+		prevNext = nextDeparture;
 	});
 
 	// Pass empty array — AlertBanner shows all alerts when no route filter is provided
