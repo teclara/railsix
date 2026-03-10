@@ -160,6 +160,7 @@ func handleStops(sc *StaticClient) http.HandlerFunc {
 			jsonError(w, "unable to fetch stops", http.StatusBadGateway)
 			return
 		}
+		slog.Info("stops proxy ok", "bytes", len(data))
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 		w.WriteHeader(http.StatusOK)
