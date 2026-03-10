@@ -15,7 +15,7 @@ services:
   gtfs-static:
     build:
       context: services
-      dockerfile: gtfs-static/Dockerfile
+      dockerfile: ../docker/Dockerfile.gtfs-static
     ports:
       - "8081:8081"
     environment:
@@ -24,7 +24,7 @@ services:
   realtime-poller:
     build:
       context: services
-      dockerfile: realtime-poller/Dockerfile
+      dockerfile: ../docker/Dockerfile.realtime-poller
     depends_on: [nats, redis, gtfs-static]
     environment:
       NATS_URL: nats://nats:4222
@@ -35,7 +35,7 @@ services:
   departures-api:
     build:
       context: services
-      dockerfile: departures-api/Dockerfile
+      dockerfile: ../docker/Dockerfile.departures-api
     ports:
       - "8082:8082"
     depends_on: [redis, gtfs-static]
@@ -48,7 +48,7 @@ services:
   sse-push:
     build:
       context: services
-      dockerfile: sse-push/Dockerfile
+      dockerfile: ../docker/Dockerfile.sse-push
     ports:
       - "8085:8085"
     depends_on: [nats]
@@ -59,7 +59,7 @@ services:
   api-gateway:
     build:
       context: services
-      dockerfile: api-gateway/Dockerfile
+      dockerfile: ../docker/Dockerfile.api-gateway
     ports:
       - "8080:8080"
     depends_on: [departures-api, redis]
