@@ -149,6 +149,8 @@ func (s *StaticStore) load(zipData []byte) error {
 	}
 
 	// --- Schedule index + trip index (single pass over trips) ---
+	// Use string interner to deduplicate repeated IDs and headsigns.
+	intern := newInterner()
 	stopIndex := make(map[string][]ScheduledDeparture)
 	tripIndex := make(map[string]TripInfo, len(static.Trips))
 	for i := range static.Trips {
@@ -160,21 +162,26 @@ func (s *StaticStore) load(zipData []byte) error {
 		if headsign == "" {
 			headsign = trip.Route.LongName
 		}
+		headsign = intern.intern(headsign)
+		tripID := intern.intern(trip.ID)
+		routeID := intern.intern(trip.Route.Id)
+		serviceID := intern.intern(trip.Service.Id)
 		tripStops := make([]TripStop, 0, len(trip.StopTimes))
 		for j := range trip.StopTimes {
 			st := &trip.StopTimes[j]
 			if st.Stop == nil {
 				continue
 			}
-			stopIndex[st.Stop.Id] = append(stopIndex[st.Stop.Id], ScheduledDeparture{
-				TripID:        trip.ID,
-				RouteID:       trip.Route.Id,
-				ServiceID:     trip.Service.Id,
+			stopID := intern.intern(st.Stop.Id)
+			stopIndex[stopID] = append(stopIndex[stopID], ScheduledDeparture{
+				TripID:        tripID,
+				RouteID:       routeID,
+				ServiceID:     serviceID,
 				Headsign:      headsign,
 				DepartureTime: int64(st.DepartureTime),
 			})
 			tripStops = append(tripStops, TripStop{
-				StopID:        st.Stop.Id,
+				StopID:        stopID,
 				ArrivalTime:   int64(st.ArrivalTime),
 				DepartureTime: int64(st.DepartureTime),
 			})
@@ -182,10 +189,10 @@ func (s *StaticStore) load(zipData []byte) error {
 		if len(tripStops) < 2 {
 			continue
 		}
-		tripIndex[trip.ID] = TripInfo{
-			TripID:    trip.ID,
-			RouteID:   trip.Route.Id,
-			ServiceID: trip.Service.Id,
+		tripIndex[tripID] = TripInfo{
+			TripID:    tripID,
+			RouteID:   routeID,
+			ServiceID: serviceID,
 			Stops:     tripStops,
 		}
 	}
@@ -230,6 +237,19 @@ func appendUnique(slice []string, val string) []string {
 		}
 	}
 	return append(slice, val)
+}
+
+// stringInterner deduplicates strings to reduce heap allocations.
+type stringInterner map[string]string
+
+func newInterner() stringInterner { return make(stringInterner, 4096) }
+
+func (si stringInterner) intern(s string) string {
+	if interned, ok := si[s]; ok {
+		return interned
+	}
+	si[s] = s
+	return s
 }
 
 // Refresh reloads GTFS data from the given ZIP bytes.
