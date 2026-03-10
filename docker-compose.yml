@@ -56,17 +56,3 @@ services:
       PORT: "8085"
       NATS_URL: nats://nats:4222
 
-  api-gateway:
-    build:
-      context: services
-      dockerfile: api-gateway/Dockerfile
-    ports:
-      - "8080:8080"
-    depends_on: [departures-api, redis]
-    environment:
-      PORT: "8080"
-      REDIS_ADDR: redis:6379
-      GTFS_STATIC_ADDR: http://gtfs-static:8081
-      DEPARTURES_ADDR: http://departures-api:8082
-      SSE_PUSH_ADDR: http://sse-push:8085
-      ALLOWED_ORIGINS: http://localhost:5173

@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-`services/` contains all deployable services. Go microservices live in `services/api-gateway/`, `services/departures-api/`, `services/gtfs-static/`, `services/realtime-poller/`, `services/sse-push/`, with shared Go code in `services/shared/`. The Go workspace file is `services/go.work`.
+`services/` contains all deployable services. Go microservices live in `services/departures-api/`, `services/gtfs-static/`, `services/realtime-poller/`, `services/sse-push/`, with shared Go code in `services/shared/`. The Go workspace file is `services/go.work`. The SvelteKit web app proxies all API calls server-side — there is no public-facing API gateway.
 
 `services/web/` contains the SvelteKit app. Routes live in `services/web/src/routes`, shared UI in `services/web/src/lib/components`, helpers in `services/web/src/lib`, and static assets in `services/web/static`. Repo-level docs live in `docs/` and the top-level `README.md`.
 

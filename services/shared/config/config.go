@@ -13,11 +13,9 @@ const (
 	EnvMetrolinxAPIKey = "METROLINX_API_KEY"
 	EnvMetrolinxBase   = "METROLINX_BASE_URL"
 	EnvPort            = "PORT"
-	EnvAllowedOrigins  = "ALLOWED_ORIGINS"
-	EnvGTFSStaticURL   = "GTFS_STATIC_URL"
-	EnvGTFSStaticAddr  = "GTFS_STATIC_ADDR"
-	EnvDeparturesAddr  = "DEPARTURES_ADDR"
-	EnvSSEPushAddr     = "SSE_PUSH_ADDR"
+	EnvAllowedOrigins = "ALLOWED_ORIGINS"
+	EnvGTFSStaticURL  = "GTFS_STATIC_URL"
+	EnvGTFSStaticAddr = "GTFS_STATIC_ADDR"
 )
 
 // Default values for environment variables.
@@ -27,8 +25,6 @@ const (
 	DefaultMetrolinxBase  = "https://api.openmetrolinx.com/OpenDataAPI/api/V1"
 	DefaultGTFSStaticURL  = "https://assets.metrolinx.com/raw/upload/Documents/Metrolinx/Open%20Data/GO-GTFS.zip"
 	DefaultGTFSStaticAddr = "http://localhost:8081"
-	DefaultDeparturesAddr = "http://localhost:8082"
-	DefaultSSEPushAddr    = "http://localhost:8085"
 )
 
 // EnvOr returns the value of the environment variable named by key,

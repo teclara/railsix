@@ -8,17 +8,16 @@ Rail Six — GO Transit real-time tracking. Two views: commute dashboard with co
 
 ## Architecture
 
-Monorepo with 6 independently deployed microservices + shared module, connected via NATS message bus and Redis shared cache:
+Monorepo with 5 independently deployed microservices + shared module, connected via NATS message bus and Redis shared cache:
 
 - **`services/shared/`** — Go module: models, NATS/Redis helpers, Metrolinx client, config, GTFS-RT parsers
 - **`services/gtfs-static/`** — GTFS ZIP loader (24h refresh), schedule queries via HTTP (port 8081)
 - **`services/realtime-poller/`** — Unified poller: 5 Metrolinx feeds every 30s → Redis + NATS (no HTTP)
 - **`services/departures-api/`** — Departure queries, NextService/Fares on-demand, alerts, network health (port 8082)
-- **`services/api-gateway/`** — Thin routing layer, CORS, health aggregation, proxies to all services (port 8080)
 - **`services/sse-push/`** — NATS → SSE streams to browsers (port 8085)
-- **`services/web/`** — SvelteKit frontend. SSR loads initial data from API gateway. Browser-side fetches go directly to API gateway (CORS enabled)
+- **`services/web/`** — SvelteKit frontend. All API calls proxied through SvelteKit server routes — no backend services are publicly exposed
 
-Data flow: Browser → API Gateway → departures-api/gtfs-static → Redis/Metrolinx
+Data flow: Browser → SvelteKit → departures-api/gtfs-static → Redis/Metrolinx
 
 ## Commands
 
@@ -35,7 +34,6 @@ go test ./departures-api/... -v   # test a specific service
 ```bash
 cd services/gtfs-static && go run .      # port 8081
 cd services/departures-api && go run .   # port 8082
-cd services/api-gateway && go run .      # port 8080
 cd services/sse-push && go run .         # port 8085
 cd services/realtime-poller && go run .  # no HTTP, polls + publishes
 ```
@@ -76,37 +74,31 @@ Unified poller: fetches all 5 Metrolinx feeds every 30s (exceptions every 60s), 
 ### Departures API (`services/departures-api/`)
 Most complex service — merges GTFS static schedule with real-time data from Redis. Handles NextService (on-demand, 30s cache), Fares (on-demand, 1h cache), Union departures enrichment, alerts, network health.
 
-### API Gateway (`services/api-gateway/`)
-Thin proxy — routes `/api/*` to gtfs-static and departures-api. Handles CORS. Health endpoint aggregates staleness from Redis timestamps.
-
 ### SSE Push (`services/sse-push/`)
 Subscribes to 5 NATS subjects, broadcasts to connected SSE clients. Event names: alerts, trip-updates, service-glance, exceptions, union-departures.
 
 ### Redis Keys
 | Key | Type | TTL | Writer | Readers |
 |-----|------|-----|--------|---------|
-| `transit:alerts` | JSON string | 5m | realtime-poller | api-gateway, departures-api |
+| `transit:alerts` | JSON string | 5m | realtime-poller | departures-api |
 | `transit:trip-updates` | Hash (tripID → JSON) | 5m | realtime-poller | departures-api |
-| `transit:service-glance` | Hash (tripNum → JSON) | 5m | realtime-poller | departures-api, api-gateway |
+| `transit:service-glance` | Hash (tripNum → JSON) | 5m | realtime-poller | departures-api |
 | `transit:exceptions` | Set (tripNumbers) | 5m | realtime-poller | departures-api |
-| `transit:union-departures` | JSON string | 5m | realtime-poller | departures-api, api-gateway |
+| `transit:union-departures` | JSON string | 5m | realtime-poller | departures-api |
 | `transit:next-service:{stopCode}` | JSON string | 30s | departures-api | departures-api |
 | `transit:fares:{from}:{to}` | JSON string | 1h | departures-api | departures-api |
-| `transit:*:updated-at` | String (unix ts) | 5m | realtime-poller | api-gateway (health) |
+| `transit:*:updated-at` | String (unix ts) | 5m | realtime-poller | departures-api |
 
 ### NATS Subjects
 `transit.alerts`, `transit.trip-updates`, `transit.service-glance`, `transit.exceptions`, `transit.union-departures`
 
-### API Routes (via gateway)
-- `GET /api/health` — aggregated health check
-- `GET /api/ready` — gtfs-static readiness
-- `GET /api/stops` — all GO Transit stops
+### API Routes (via SvelteKit proxy)
 - `GET /api/departures/{stopCode}` — departures for a station (optional `?dest=` filter)
 - `GET /api/union-departures` — Union Station departures
 - `GET /api/alerts` — active service alerts
 - `GET /api/network-health` — active trains per GO line
 - `GET /api/fares/{from}/{to}` — fare info between two stations
-- `GET /api/sse` — SSE stream for real-time updates
+- `GET /health` — web health check
 
 ## Web Structure
 
@@ -116,7 +108,8 @@ Two pages:
 
 Key files:
 - `src/lib/api.ts` — server-only API functions (uses `$env/dynamic/private`)
-- `src/lib/api-client.ts` — browser-side fetch wrappers using `PUBLIC_API_URL` env var
+- `src/lib/api-client.ts` — browser-side fetch wrappers (same-origin, proxied through SvelteKit server routes)
+- `src/lib/server/proxy.ts` — server-side proxy helper for forwarding API requests to internal services
 - `src/lib/sse.ts` — SSE client for real-time alerts and union departures
 - `src/routes/+page.server.ts` — loads stops and alerts server-side
 - `src/routes/+page.svelte` — renders MyCommute (commute dashboard)
@@ -150,7 +143,7 @@ Key components:
 ### Services (common)
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | varies | Server port (8080 gateway, 8081 static, 8082 departures, 8085 sse) |
+| `PORT` | varies | Server port (8081 static, 8082 departures, 8085 sse) |
 | `NATS_URL` | `nats://localhost:4222` | NATS server address |
 | `REDIS_ADDR` | `localhost:6379` | Redis server address |
 | `REDIS_PASSWORD` | — | Redis password |
@@ -158,15 +151,12 @@ Key components:
 | `METROLINX_BASE_URL` | `https://api.openmetrolinx.com/...` | Metrolinx API base |
 | `GTFS_STATIC_URL` | Metrolinx default | URL to GTFS static ZIP |
 | `GTFS_STATIC_ADDR` | `http://localhost:8081` | GTFS static service address |
-| `DEPARTURES_ADDR` | `http://localhost:8082` | Departures API service address |
-| `SSE_PUSH_ADDR` | `http://localhost:8085` | SSE push service address |
-| `ALLOWED_ORIGINS` | `http://localhost:5173` | CORS allowed origins (comma-separated) |
+| `ALLOWED_ORIGINS` | `http://localhost:5173` | CORS allowed origins (for sse-push) |
 
 ### Web
 | Variable | Description |
 |---|---|
-| `API_BASE_URL` | API gateway URL for SSR (e.g. `http://localhost:8080`) |
-| `PUBLIC_API_URL` | API gateway URL for browser-side fetches |
+| `API_BASE_URL` | Departures API URL for SSR (e.g. `http://localhost:8082`) |
 | `PUBLIC_MAPBOX_TOKEN` | Mapbox GL access token |
 
 ## Deploy
