@@ -1,4 +1,10 @@
+import { env } from '$env/dynamic/public';
 import type { Alert } from './api';
+
+/** API gateway base URL — set PUBLIC_API_URL in env (defaults to localhost:8080 for dev). */
+function apiBase(): string {
+	return env.PUBLIC_API_URL || 'http://localhost:8080';
+}
 
 export class ApiError extends Error {
 	constructor(
@@ -11,7 +17,7 @@ export class ApiError extends Error {
 }
 
 export async function fetchAlerts(): Promise<Alert[]> {
-	const res = await fetch('/api/alerts', { signal: AbortSignal.timeout(10000) });
+	const res = await fetch(`${apiBase()}/api/alerts`, { signal: AbortSignal.timeout(10000) });
 	if (!res.ok) throw new ApiError(res.status, `alerts: ${res.status}`);
 	return res.json();
 }
@@ -35,9 +41,10 @@ export type Departure = {
 };
 
 export async function fetchDepartures(stopCode: string, destCode?: string): Promise<Departure[]> {
+	const base = apiBase();
 	const url = destCode
-		? `/api/departures/${encodeURIComponent(stopCode)}?dest=${encodeURIComponent(destCode)}`
-		: `/api/departures/${encodeURIComponent(stopCode)}`;
+		? `${base}/api/departures/${encodeURIComponent(stopCode)}?dest=${encodeURIComponent(destCode)}`
+		: `${base}/api/departures/${encodeURIComponent(stopCode)}`;
 	const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
 	if (!res.ok) throw new ApiError(res.status, `departures: ${res.status}`);
 	return res.json();
@@ -56,7 +63,9 @@ export type UnionDeparture = {
 };
 
 export async function fetchUnionDepartures(): Promise<UnionDeparture[]> {
-	const res = await fetch('/api/union-departures', { signal: AbortSignal.timeout(10000) });
+	const res = await fetch(`${apiBase()}/api/union-departures`, {
+		signal: AbortSignal.timeout(10000)
+	});
 	if (!res.ok) throw new ApiError(res.status, `union-departures: ${res.status}`);
 	return res.json();
 }
@@ -68,7 +77,9 @@ export type NetworkLine = {
 };
 
 export async function fetchNetworkHealth(): Promise<NetworkLine[]> {
-	const res = await fetch('/api/network-health', { signal: AbortSignal.timeout(10000) });
+	const res = await fetch(`${apiBase()}/api/network-health`, {
+		signal: AbortSignal.timeout(10000)
+	});
 	if (!res.ok) throw new ApiError(res.status, `network-health: ${res.status}`);
 	return res.json();
 }
@@ -80,9 +91,12 @@ export type FareInfo = {
 };
 
 export async function fetchFares(from: string, to: string): Promise<FareInfo[]> {
-	const res = await fetch(`/api/fares/${encodeURIComponent(from)}/${encodeURIComponent(to)}`, {
-		signal: AbortSignal.timeout(10000)
-	});
+	const res = await fetch(
+		`${apiBase()}/api/fares/${encodeURIComponent(from)}/${encodeURIComponent(to)}`,
+		{
+			signal: AbortSignal.timeout(10000)
+		}
+	);
 	if (!res.ok) throw new ApiError(res.status, `fares: ${res.status}`);
 	return res.json();
 }
