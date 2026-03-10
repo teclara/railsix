@@ -90,7 +90,7 @@ describe('display helpers', () => {
 
 		expect(statusText(onTime)).toBe('ON TIME');
 		expect(statusClass(onTime)).toBe('text-green-400');
-		expect(statusText(delayed)).toBe('+7M');
+		expect(statusText(delayed)).toBe('DLY +7');
 		expect(statusClass(delayed)).toBe('text-amber-400');
 		expect(statusText(cancelled)).toBe('CANCEL');
 		expect(statusClass(cancelled)).toBe('text-red-500');

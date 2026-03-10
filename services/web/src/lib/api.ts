@@ -55,5 +55,8 @@ export function getNetworkHealth() {
 }
 
 export function getFares(fromCode: string, toCode: string) {
-	return fetchApi(getApiBaseUrl(), `/fares/${encodeURIComponent(fromCode)}/${encodeURIComponent(toCode)}`);
+	return fetchApi(
+		getApiBaseUrl(),
+		`/fares/${encodeURIComponent(fromCode)}/${encodeURIComponent(toCode)}`
+	);
 }
