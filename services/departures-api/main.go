@@ -140,6 +140,7 @@ func main() {
 
 func registerRoutes(mux *http.ServeMux, sc *StaticClient, rc *RedisClient, mx *metrolinx.Client) {
 	mux.HandleFunc("GET /health", handleHealth)
+	mux.HandleFunc("GET /stops", handleStops(sc))
 	mux.HandleFunc("GET /departures/{stopCode}", handleDepartures(sc, rc, mx))
 	mux.HandleFunc("GET /union-departures", handleUnionDepartures(rc))
 	mux.HandleFunc("GET /fares/{from}/{to}", handleFares(rc, mx))
@@ -149,6 +150,23 @@ func registerRoutes(mux *http.ServeMux, sc *StaticClient, rc *RedisClient, mx *m
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, map[string]string{"status": "ok"})
+}
+
+func handleStops(sc *StaticClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		data, err := sc.GetStops()
+		if err != nil {
+			slog.Warn("stops proxy failed", "error", err)
+			jsonError(w, "unable to fetch stops", http.StatusBadGateway)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.WriteHeader(http.StatusOK)
+		if _, writeErr := w.Write(data); writeErr != nil {
+			slog.Warn("write stops response failed", "error", writeErr)
+		}
+	}
 }
 
 func handleDepartures(sc *StaticClient, rc *RedisClient, mx *metrolinx.Client) http.HandlerFunc {

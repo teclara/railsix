@@ -23,7 +23,7 @@ No backend services are publicly exposed. All traffic flows through SvelteKit se
 
 - Browser fetches `/api/*` (same-origin) → SvelteKit `+server.ts` routes → `proxyFetch()` → departures-api
 - Browser fetches `/api/sse` → SvelteKit proxies to sse-push service
-- SSR `+page.server.ts` loads → `api.ts` functions → gtfs-static (stops) or departures-api (alerts, departures)
+- SSR `+page.server.ts` loads → `api.ts` functions → departures-api (stops, alerts, departures)
 
 **Important:** Go backend routes have **no `/api/` prefix** (e.g., `/departures/{stopCode}`, `/alerts`). The `/api/` prefix exists only in the SvelteKit routing layer. Proxy paths in `+server.ts` files must NOT include `/api/`.
 
@@ -121,7 +121,7 @@ Two pages:
 - `/departures` — standalone split-flap departure board. Defaults to Union Station, with station picker dropdown. Auto-scales font to viewport for TV/kiosk display.
 
 Key files:
-- `src/lib/api.ts` — server-only API functions (uses `$env/dynamic/private`). Uses `API_BASE_URL` for departures-api, `GTFS_STATIC_ADDR` for gtfs-static
+- `src/lib/api.ts` — server-only API functions (uses `$env/dynamic/private`). All requests go to `API_BASE_URL` (departures-api)
 - `src/lib/api-client.ts` — browser-side fetch wrappers (same-origin, proxied through SvelteKit server routes)
 - `src/lib/server/proxy.ts` — `proxyFetch()` helper: forwards requests to `API_BASE_URL`, `getSseUrl()` for SSE
 - `src/lib/sse.ts` — SSE client for real-time alerts and union departures
@@ -170,7 +170,6 @@ Key components:
 | Variable | Default | Description |
 |---|---|---|
 | `API_BASE_URL` | `http://localhost:8082` (dev) | Departures API URL for SSR and proxy |
-| `GTFS_STATIC_ADDR` | `http://localhost:8081` (dev) | GTFS static service URL for SSR (stops) |
 | `SSE_PUSH_URL` | `http://localhost:8085` (dev) | SSE push service URL for proxy |
 | `PUBLIC_MAPBOX_TOKEN` | — | Mapbox GL access token |
 

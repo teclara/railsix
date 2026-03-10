@@ -9,10 +9,6 @@ function getApiBaseUrl() {
 	return url;
 }
 
-function getGtfsStaticUrl() {
-	return env.GTFS_STATIC_ADDR || (dev ? 'http://localhost:8081' : getApiBaseUrl());
-}
-
 async function fetchApi<T>(baseUrl: string, path: string): Promise<T> {
 	const res = await fetch(`${baseUrl}${path}`, {
 		signal: AbortSignal.timeout(5000)
@@ -36,7 +32,7 @@ export interface Alert {
 }
 
 export function getAllStops() {
-	return fetchApi<Stop[]>(getGtfsStaticUrl(), '/stops');
+	return fetchApi<Stop[]>(getApiBaseUrl(), '/stops');
 }
 
 export function getStopDepartures(stopCode: string, destCode?: string) {

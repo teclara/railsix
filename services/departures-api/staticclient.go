@@ -95,6 +95,11 @@ type ScheduleCandidate struct {
 	ServiceDay     string   `json:"serviceDay"`
 }
 
+// GetStops proxies the /stops endpoint from gtfs-static, returning raw JSON.
+func (sc *StaticClient) GetStops() ([]byte, error) {
+	return sc.get("/stops")
+}
+
 // GetSchedule returns pre-filtered departure candidates for a stop code.
 // All filtering (last stop, service active, time window, dedup) is done server-side.
 func (sc *StaticClient) GetSchedule(code string, now time.Time) ([]ScheduleCandidate, error) {
