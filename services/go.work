@@ -1,0 +1,9 @@
+go 1.25.8
+
+use (
+	./departures-api
+	./gtfs-static
+	./realtime-poller
+	./shared
+	./sse-push
+)

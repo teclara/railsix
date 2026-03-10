@@ -1,6 +1,6 @@
 # Rail Six
 
-![API](https://github.com/teclara/railsix/actions/workflows/api.yml/badge.svg)
+![Services](https://github.com/teclara/railsix/actions/workflows/api.yml/badge.svg)
 ![Web](https://github.com/teclara/railsix/actions/workflows/web.yml/badge.svg)
 
 Real-time GO Transit tracking for Toronto commuters. Split-flap departure board, commute dashboard with countdown timer, delay alerts, and network health — free, no ads.
@@ -17,37 +17,49 @@ Real-time GO Transit tracking for Toronto commuters. Split-flap departure board,
 
 ## Architecture
 
-Monorepo with two services:
+Monorepo with 6 microservices + shared module, connected via NATS and Redis:
 
 ```
-Browser -> SvelteKit (SSR + proxy) -> Go API -> Metrolinx OpenData API
+Browser → SvelteKit (SSR) → API Gateway → departures-api/gtfs-static → Redis/Metrolinx
 ```
 
-- **`api/`** — Go API server. Downloads GTFS static data at startup (refreshes every 24h), polls GTFS-RT and Metrolinx proprietary feeds in background goroutines. Merges static schedule with real-time trip updates for accurate departures.
-- **`web/`** — SvelteKit frontend. Server-side rendering for initial load, client-side polling every 30s. Split-flap CSS animations for the departure board aesthetic.
+All services live under `services/`:
+- **`shared/`** — Go module: models, NATS/Redis helpers, Metrolinx client
+- **`gtfs-static/`** — GTFS ZIP loader, schedule queries via HTTP
+- **`realtime-poller/`** — Unified poller for Metrolinx feeds → Redis + NATS
+- **`departures-api/`** — Departure queries, fares, alerts, network health
+- **`api-gateway/`** — Thin routing layer, CORS, health aggregation
+- **`sse-push/`** — NATS → SSE streams to browsers
+- **`web/`** — SvelteKit frontend
 
 ## Getting Started
 
 ### Prerequisites
 
-- Go 1.22+
-- Node.js 18+
+- Go 1.25+
+- Node.js 22+
 - A [Metrolinx OpenData API key](https://www.gotransit.com/en/open-data)
 
-### API
+### Full Stack (Docker)
 
 ```bash
-cd api
-export METROLINX_API_KEY=your_key_here
-go run ./cmd/server/
+docker compose up
 ```
 
-Starts on port 8080.
+### Individual Services
+
+```bash
+cd services/gtfs-static && go run .       # port 8081
+cd services/realtime-poller && go run .   # polls + publishes
+cd services/departures-api && go run .    # port 8082
+cd services/api-gateway && go run .       # port 8080
+cd services/sse-push && go run .          # port 8085
+```
 
 ### Web
 
 ```bash
-cd web
+cd services/web
 npm install
 echo "API_BASE_URL=http://localhost:8080" > .env
 npm run dev
@@ -55,31 +67,22 @@ npm run dev
 
 Starts on port 5173.
 
-If you're exposing the Vite dev server through Tunnelmole or another proxy that does not forward
-Vite's HMR websocket, use:
-
-```bash
-cd web
-npm run dev:tunnel
-```
-
-That keeps the site reachable over the tunnel without the repeating websocket errors in the browser.
-
 ## API Endpoints
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/health` | Health check |
+| GET | `/api/health` | Aggregated health check |
 | GET | `/api/stops` | All GO Transit stops |
 | GET | `/api/departures/{stopCode}` | Departures for a station (`?dest=` optional) |
 | GET | `/api/union-departures` | Union Station departure board |
 | GET | `/api/alerts` | Active service alerts |
 | GET | `/api/network-health` | Active trains per GO line |
 | GET | `/api/fares/{from}/{to}` | Fare info between two stations |
+| GET | `/api/sse` | SSE stream for real-time updates |
 
 ## Tech Stack
 
-- **Backend:** Go stdlib (`net/http`, `slog`), GTFS protobuf parsing
+- **Backend:** Go stdlib (`net/http`, `slog`), NATS, Redis, GTFS protobuf parsing
 - **Frontend:** SvelteKit 2, Svelte 5, Tailwind CSS 4
 - **Deploy:** Railway with Railpack builder
 - **CI:** GitHub Actions (Go test/vet, SvelteKit check/lint/build)
@@ -87,9 +90,9 @@ That keeps the site reachable over the tunnel without the repeating websocket er
 ## Development
 
 ```bash
-# API
-cd api && go test ./... -v && go vet ./...
+# Services
+cd services && go test ./... -v -short && go vet ./...
 
 # Web
-cd web && npm run check && npm run lint && npm run build
+cd services/web && npm run check && npm run lint && npm run build
 ```
