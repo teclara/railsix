@@ -1,3 +1,6 @@
+# Worktrees
+.worktrees/
+
 # Go binaries
 api/server
 api/*.exe
