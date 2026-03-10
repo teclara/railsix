@@ -169,12 +169,14 @@ func handleDepartures(sc *StaticClient, rc *RedisClient, mx *metrolinx.Client) h
 		if mx != nil && len(departures) > 0 {
 			nsLines, ok := rc.GetNextService(r.Context(), stopCode)
 			if !ok {
-				if fetched, err := mx.GetNextService(r.Context(), stopCode); err == nil {
+				nsCtx, nsCancel := context.WithTimeout(r.Context(), 3*time.Second)
+				if fetched, err := mx.GetNextService(nsCtx, stopCode); err == nil {
 					nsLines = fetched
 					rc.SetNextService(r.Context(), stopCode, fetched)
 				} else {
 					slog.Warn("NextService fetch failed", "stopCode", stopCode, "error", err)
 				}
+				nsCancel()
 			}
 			if nsLines != nil {
 				byLine := make(map[string][]models.NextServiceLine, len(nsLines))
