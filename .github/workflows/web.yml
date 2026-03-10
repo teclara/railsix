@@ -4,17 +4,17 @@ on:
   push:
     branches: [main]
     paths:
-      - web/**
+      - services/web/**
       - .github/workflows/web.yml
   pull_request:
     paths:
-      - web/**
+      - services/web/**
       - .github/workflows/web.yml
   workflow_dispatch:
 
 defaults:
   run:
-    working-directory: web
+    working-directory: services/web
 
 jobs:
   test:
@@ -26,7 +26,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: services/web/package-lock.json
 
       - run: npm ci
 
@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: services/web/package-lock.json
 
       - run: npm ci
 
@@ -56,7 +56,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: services/web/package-lock.json
 
       - run: npm ci
 
@@ -71,7 +71,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: services/web/package-lock.json
 
       - run: npm ci
 

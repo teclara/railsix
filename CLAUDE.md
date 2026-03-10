@@ -16,11 +16,9 @@ Monorepo with 6 independently deployed microservices + shared module, connected 
 - **`services/departures-api/`** — Departure queries, NextService/Fares on-demand, alerts, network health (port 8082)
 - **`services/api-gateway/`** — Thin routing layer, CORS, health aggregation, proxies to all services (port 8080)
 - **`services/sse-push/`** — NATS → SSE streams to browsers (port 8085)
-- **`web/`** — SvelteKit frontend. SSR loads initial data from API gateway. Browser-side fetches go directly to API gateway (CORS enabled)
+- **`services/web/`** — SvelteKit frontend. SSR loads initial data from API gateway. Browser-side fetches go directly to API gateway (CORS enabled)
 
 Data flow: Browser → API Gateway → departures-api/gtfs-static → Redis/Metrolinx
-
-Legacy monolith in `api/` is deprecated — see `api/DEPRECATED.md`.
 
 ## Commands
 
@@ -50,7 +48,7 @@ docker compose up nats redis      # just infrastructure
 
 ### Web (SvelteKit)
 ```bash
-cd web
+cd services/web
 npm run dev                       # start dev server (port 5173)
 npm run check                     # svelte-kit sync + svelte-check (TypeScript)
 npm run lint                      # prettier --check + eslint
