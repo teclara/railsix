@@ -133,7 +133,7 @@
 	<CommuteSetup {stops} {buildInfo} />
 {:else}
 	<div
-		class="my-commute bg-surface h-[calc(100dvh-60px)] text-white font-mono p-4 flex flex-col justify-center gap-4 max-w-xl mx-auto overflow-hidden"
+		class="my-commute bg-surface h-[calc(100dvh-60px)] text-white font-mono p-4 flex flex-col gap-4 max-w-xl mx-auto overflow-hidden"
 	>
 		<!-- Header -->
 		<div class="flex items-start justify-between pt-2">
@@ -235,7 +235,7 @@
 			</div>
 		{/if}
 
-		<footer class="pt-2 pb-4 text-center max-w-sm mx-auto">
+		<footer class="mt-auto pt-2 pb-4 text-center max-w-sm mx-auto">
 			<p class="text-gray-500 text-[9px] font-mono leading-relaxed">
 				Not affiliated with Metrolinx or GO Transit. Schedule data may be inaccurate or delayed.
 				Always confirm with official sources before travelling.

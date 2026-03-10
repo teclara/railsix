@@ -24,9 +24,9 @@
 		background: color-mix(in srgb, var(--color-surface-raised) 96%, transparent);
 		color: var(--color-gray-500);
 		font-family: monospace;
-		font-size: 10px;
+		font-size: 9px;
 		letter-spacing: 0.08em;
-		text-transform: uppercase;
+		text-transform: lowercase;
 	}
 
 	.build-label {
