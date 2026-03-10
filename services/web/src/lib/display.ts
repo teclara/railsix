@@ -130,7 +130,7 @@ export function statusText(d: Departure): string {
 	if (d.isCancelled) return 'CANCEL';
 	const s = d.status?.toUpperCase() ?? '';
 	if (s === 'PROCEED' || s === 'WAIT') return s;
-	if (d.delayMinutes && d.delayMinutes > 0) return `+${d.delayMinutes}M`;
+	if (d.delayMinutes && d.delayMinutes > 0) return `DLY +${d.delayMinutes}`;
 	return 'ON TIME';
 }
 

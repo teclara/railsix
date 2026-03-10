@@ -27,7 +27,7 @@
 
 	function boardStatusText(d: Departure): string {
 		if (d.isCancelled || d.status === 'Cancelled') return 'CANCELLED';
-		if (d.delayMinutes && d.delayMinutes > 0) return `DLY +${d.delayMinutes} MIN`;
+		if (d.delayMinutes && d.delayMinutes > 0) return `DLY +${d.delayMinutes}`;
 		const s = d.status?.toUpperCase() ?? '';
 		if (s === 'PROCEED' || s === 'WAIT') return s;
 		return 'ON TIME';
