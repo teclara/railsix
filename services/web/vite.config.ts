@@ -33,11 +33,10 @@ export default defineConfig(({ mode }) => {
 		};
 	}
 
-	let appVersion = '0';
+	let appVersion: string;
 	try {
 		appVersion = execSync('git rev-list --count HEAD', { encoding: 'utf-8' }).trim();
 	} catch {
-		// git not available (e.g. Railway build) — fall back to env or default
 		appVersion = process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? '0';
 	}
 
