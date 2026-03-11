@@ -1,13 +1,7 @@
 <script lang="ts">
 	import SplitFlapChar from './SplitFlapChar.svelte';
 	import type { Departure } from '$lib/api-client';
-	import {
-		padRight,
-		padCenter,
-		departureDisplayTime,
-		isWaiting,
-		platformText
-	} from '$lib/display';
+	import { padRight, padCenter, departureDisplayTime, isWaiting, platformText } from '$lib/display';
 
 	let {
 		departures = [],
