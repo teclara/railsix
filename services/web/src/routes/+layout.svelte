@@ -209,7 +209,7 @@
 {/if}
 
 <nav class="bottom-nav" aria-label="Main navigation">
-	<a href="/" class="nav-item" class:active={path === '/'} data-sveltekit-reload>
+	<a href="/" class="nav-item" class:active={path === '/'}>
 		<span class="icon">⊟</span>
 		<span class="label">My Commute</span>
 	</a>
@@ -217,7 +217,6 @@
 		href="/departures"
 		class="nav-item"
 		class:active={path === '/departures'}
-		data-sveltekit-reload
 	>
 		<span class="icon">▤</span>
 		<span class="label">Departures</span>
