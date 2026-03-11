@@ -213,11 +213,7 @@
 		<span class="icon">⊟</span>
 		<span class="label">My Commute</span>
 	</a>
-	<a
-		href="/departures"
-		class="nav-item"
-		class:active={path === '/departures'}
-	>
+	<a href="/departures" class="nav-item" class:active={path === '/departures'}>
 		<span class="icon">▤</span>
 		<span class="label">Departures</span>
 	</a>
