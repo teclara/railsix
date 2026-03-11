@@ -380,10 +380,7 @@
 	</div>
 
 	{#if stationAlert}
-		<div
-			class="text-red-500 text-center py-1 tracking-wider uppercase"
-			style="font-size: 0.55em;"
-		>
+		<div class="text-red-500 text-center py-1 tracking-wider uppercase" style="font-size: 0.55em;">
 			! {stationAlert.toUpperCase()}
 		</div>
 	{/if}

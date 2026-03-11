@@ -90,4 +90,3 @@ export async function fetchNetworkHealth(): Promise<NetworkLine[]> {
 	if (!res.ok) throw new ApiError(res.status, `network-health: ${res.status}`);
 	return res.json();
 }
-

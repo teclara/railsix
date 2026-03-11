@@ -53,4 +53,3 @@ export function getUnionDepartures() {
 export function getNetworkHealth() {
 	return fetchApi<unknown[]>(getApiBaseUrl(), '/network-health');
 }
-
