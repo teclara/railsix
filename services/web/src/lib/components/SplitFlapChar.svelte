@@ -11,8 +11,8 @@
 	let bottomValue = $state(untrack(() => value));
 
 	const CHARS = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:+-.';
-	const FLIP_DURATION_MS = 50;
-	const FLIP_SETTLE_MS = 10;
+	const FLIP_DURATION_MS = 110;
+	const FLIP_SETTLE_MS = 24;
 
 	function getNextChar(current: string): string {
 		const idx = CHARS.indexOf(current.toUpperCase());
@@ -122,7 +122,7 @@
 	.tile.flipping {
 		top: 0;
 		height: 100%;
-		animation: flip var(--flip-duration) linear forwards;
+		animation: flip var(--flip-duration) cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
 		transform-origin: center;
 		background: var(--color-surface-input);
 		z-index: 2;

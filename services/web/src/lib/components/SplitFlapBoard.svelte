@@ -31,6 +31,18 @@
 		return 'text-green-400';
 	}
 
+	const TIME_DELAY_MS = 35;
+	const ROUTE_DELAY_BASE_MS = 90;
+	const ROUTE_DELAY_MS = 28;
+	const CARS_DELAY_BASE_MS = 150;
+	const CARS_DELAY_MS = 35;
+	const PLATFORM_DELAY_BASE_MS = 210;
+	const PLATFORM_DELAY_MS = 30;
+	const ARRIVAL_DELAY_BASE_MS = 260;
+	const ARRIVAL_DELAY_MS = 28;
+	const STATUS_DELAY_BASE_MS = 320;
+	const STATUS_DELAY_MS = 28;
+
 	let rows = $derived(departures.slice(0, maxRows));
 </script>
 
@@ -54,37 +66,37 @@
 		>
 			<span class="col-time text-amber-400">
 				{#each formatTime(departureDisplayTime(dep)).split('') as char, j}
-					<SplitFlapChar value={char} delay={j * 15} />
+					<SplitFlapChar value={char} delay={j * TIME_DELAY_MS} />
 				{/each}
 			</span>
 
 			<span class="col-route text-white">
 				{#each padRight(dep.isExpress ? dep.line + ' EXP' : dep.line, 6).split('') as char, j}
-					<SplitFlapChar value={char} delay={20 + j * 10} />
+					<SplitFlapChar value={char} delay={ROUTE_DELAY_BASE_MS + j * ROUTE_DELAY_MS} />
 				{/each}
 			</span>
 
 			<span class="col-cars text-gray-400">
 				{#each padRight(dep.cars && dep.cars !== '-' ? dep.cars + 'C' : '---', 3).split('') as char, j}
-					<SplitFlapChar value={char} delay={40 + j * 15} />
+					<SplitFlapChar value={char} delay={CARS_DELAY_BASE_MS + j * CARS_DELAY_MS} />
 				{/each}
 			</span>
 
 			<span class="col-platform text-white" class:text-amber-300={isWaiting(dep)}>
 				{#each padCenter(platformText(dep), 5).split('') as char, j}
-					<SplitFlapChar value={char} delay={50 + j * 12} />
+					<SplitFlapChar value={char} delay={PLATFORM_DELAY_BASE_MS + j * PLATFORM_DELAY_MS} />
 				{/each}
 			</span>
 
 			<span class="col-arrival text-amber-300">
 				{#each padRight(dep.arrivalTime ?? '-----', 5).split('') as char, j}
-					<SplitFlapChar value={char} delay={60 + j * 10} />
+					<SplitFlapChar value={char} delay={ARRIVAL_DELAY_BASE_MS + j * ARRIVAL_DELAY_MS} />
 				{/each}
 			</span>
 
 			<span class="col-status {boardStatusClass(dep)}">
 				{#each padRight(boardStatusText(dep), 9).split('') as char, j}
-					<SplitFlapChar value={char} delay={70 + j * 10} />
+					<SplitFlapChar value={char} delay={STATUS_DELAY_BASE_MS + j * STATUS_DELAY_MS} />
 				{/each}
 			</span>
 		</div>
