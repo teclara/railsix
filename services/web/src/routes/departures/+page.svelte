@@ -556,7 +556,7 @@
 
 	.flap-row-station {
 		display: grid;
-		grid-template-columns: 5ch 1fr 3ch 5ch 7ch;
+		grid-template-columns: 5ch 1fr 4ch 6ch 8ch;
 		gap: 0.4em;
 		align-items: center;
 	}
@@ -751,7 +751,7 @@
 		}
 
 		.flap-row-station {
-			grid-template-columns: 5ch 1fr 3ch 5ch 7ch;
+			grid-template-columns: 5ch 1fr 4ch 6ch 8ch;
 			gap: 0.3em;
 		}
 	}
