@@ -37,7 +37,7 @@ export default defineConfig(({ mode }) => {
 	try {
 		appVersion = execSync('git rev-list --count HEAD', { encoding: 'utf-8' }).trim();
 	} catch {
-		appVersion = process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? '0';
+		appVersion = '0';
 	}
 
 	return {
