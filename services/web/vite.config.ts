@@ -1,21 +1,8 @@
 /// <reference types="node" />
-import { execSync } from 'child_process';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import { loadEnv } from 'vite';
-
-function getAppVersion() {
-	try {
-		const repoRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
-		return execSync('git rev-list --count HEAD -- services/web', {
-			cwd: repoRoot,
-			encoding: 'utf-8'
-		}).trim();
-	} catch {
-		return '0';
-	}
-}
 
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, '.', '');
@@ -45,12 +32,7 @@ export default defineConfig(({ mode }) => {
 		};
 	}
 
-	const appVersion = getAppVersion();
-
 	return {
-		define: {
-			__APP_VERSION__: JSON.stringify(appVersion)
-		},
 		plugins: [tailwindcss(), sveltekit()],
 		server: {
 			host: true,

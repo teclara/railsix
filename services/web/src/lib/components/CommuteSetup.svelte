@@ -1,12 +1,10 @@
 <script lang="ts">
 	import type { Stop } from '$lib/api';
-	import type { BuildInfo } from '$lib/build-info';
 	import { commute } from '$lib/stores/commute';
 	import { track } from '$lib/track';
-	import BuildStamp from './BuildStamp.svelte';
 	import StationSearchInput from './StationSearchInput.svelte';
 
-	let { stops, buildInfo }: { stops: Stop[]; buildInfo: BuildInfo } = $props();
+	let { stops }: { stops: Stop[] } = $props();
 
 	const trainStops = $derived(stops.filter((s) => /\bGO$/.test(s.name)));
 
@@ -182,8 +180,5 @@
 				class="hover:text-gray-400 transition-colors">Teclara Technologies Inc.</a
 			>
 		</p>
-		<div class="mt-3 flex justify-center">
-			<BuildStamp {buildInfo} />
-		</div>
 	</footer>
 </div>

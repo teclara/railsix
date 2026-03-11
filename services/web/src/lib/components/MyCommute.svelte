@@ -6,7 +6,6 @@
 	import type { Stop } from '$lib/api';
 	import type { Alert } from '$lib/api';
 	import type { Departure } from '$lib/api-client';
-	import type { BuildInfo } from '$lib/build-info';
 	import { fetchAlerts, fetchDepartures } from '$lib/api-client';
 	import { normalizeAlerts } from '$lib/alerts';
 	import { onSSE, onSSEStatus } from '$lib/sse';
@@ -17,14 +16,9 @@
 	import CountdownTimer from './CountdownTimer.svelte';
 	import AlertBanner from './AlertBanner.svelte';
 	import CommuteSetup from './CommuteSetup.svelte';
-	import BuildStamp from './BuildStamp.svelte';
 	import SettingsPanel from './SettingsPanel.svelte';
 
-	let {
-		stops,
-		alerts: initialAlerts,
-		buildInfo
-	}: { stops: Stop[]; alerts: Alert[]; buildInfo: BuildInfo } = $props();
+	let { stops, alerts: initialAlerts }: { stops: Stop[]; alerts: Alert[] } = $props();
 
 	let commuteState = $state<CommuteStore>({ toWork: null, toHome: null });
 	const unsubCommute = commute.subscribe((s) => (commuteState = s));
@@ -177,7 +171,7 @@
 </script>
 
 {#if !commuteState.toWork && !commuteState.toHome}
-	<CommuteSetup {stops} {buildInfo} />
+	<CommuteSetup {stops} />
 {:else}
 	<div
 		class="my-commute bg-surface h-[calc(100dvh-60px)] text-white font-mono p-4 flex flex-col gap-3 max-w-xl mx-auto overflow-hidden"
@@ -298,9 +292,6 @@
 					class="hover:text-gray-400 transition-colors">Teclara Technologies Inc.</a
 				>
 			</p>
-			<div class="mt-1.5 flex justify-center">
-				<BuildStamp {buildInfo} />
-			</div>
 		</footer>
 	</div>
 
