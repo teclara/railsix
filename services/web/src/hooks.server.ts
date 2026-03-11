@@ -51,27 +51,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 			throw error(429, 'Too many SSE connections');
 		}
 		sseConns.set(ip, current + 1);
-		const response = await resolve(event);
 
-		// Wrap the body to detect close without consuming it
-		const original = response.body;
-		if (original) {
-			const { readable, writable } = new TransformStream();
-			original
-				.pipeTo(writable)
-				.catch(() => {})
-				.finally(() => {
-					const count = (sseConns.get(ip) ?? 1) - 1;
-					if (count <= 0) sseConns.delete(ip);
-					else sseConns.set(ip, count);
-				});
-			return addSecurityHeaders(
-				new Response(readable, {
-					status: response.status,
-					headers: response.headers
-				})
-			);
-		}
+		// Decrement count when client disconnects — no TransformStream wrapping
+		// which was breaking the SSE stream.
+		event.request.signal.addEventListener('abort', () => {
+			const count = (sseConns.get(ip) ?? 1) - 1;
+			if (count <= 0) sseConns.delete(ip);
+			else sseConns.set(ip, count);
+		});
+
+		const response = await resolve(event);
 		return addSecurityHeaders(response);
 	}
 

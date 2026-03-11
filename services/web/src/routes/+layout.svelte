@@ -5,7 +5,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { track } from '$lib/track';
 	import { connectSSE, disconnectSSE, onSSEStatus } from '$lib/sse';
-	let { children, data } = $props();
+	let { children } = $props();
 	let path = $derived(page.url.pathname);
 
 	// SSE connection status
@@ -108,8 +108,7 @@
 			navigator.serviceWorker.register('/sw.js');
 		}
 
-		const sseUrl = data.sseUrl ? `${data.sseUrl}/sse` : '/api/sse';
-		connectSSE(sseUrl);
+		connectSSE('/api/sse');
 		onSSEStatus((connected) => (sseConnected = connected));
 	});
 
