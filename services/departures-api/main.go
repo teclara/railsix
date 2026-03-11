@@ -285,6 +285,11 @@ func handleUnionDepartures(rc *RedisClient) http.HandlerFunc {
 			if rc.IsTripCancelled(r.Context(), d.TripNumber) {
 				slim[i].IsCancelled = true
 			}
+			if update, ok := rc.GetTripUpdate(r.Context(), d.TripNumber); ok {
+				if update.ScheduleRelationship == "CANCELED" {
+					slim[i].IsCancelled = true
+				}
+			}
 		}
 		respondJSON(w, slim)
 	}
