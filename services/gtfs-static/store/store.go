@@ -96,17 +96,17 @@ func (s *StaticStore) load(zipData []byte) error {
 		if gs.Latitude == nil || gs.Longitude == nil {
 			continue
 		}
-		var parentID string
-		if gs.Parent != nil {
-			parentID = gs.Parent.Id
+		// Only include parent stations (location_type=1), not individual
+		// platforms or bus stops.
+		if gs.Type != gtfs.StopType_Station {
+			continue
 		}
 		stops = append(stops, models.Stop{
-			ID:       gs.Id,
-			Code:     gs.Code,
-			Name:     gs.Name,
-			Lat:      *gs.Latitude,
-			Lon:      *gs.Longitude,
-			ParentID: parentID,
+			ID:   gs.Id,
+			Code: gs.Code,
+			Name: gs.Name,
+			Lat:  *gs.Latitude,
+			Lon:  *gs.Longitude,
 		})
 	}
 
