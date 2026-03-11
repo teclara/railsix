@@ -12,11 +12,17 @@ import (
 	"time"
 	_ "time/tzdata"
 
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/teclara/railsix/gtfs-static/store"
 	"github.com/teclara/railsix/shared/config"
+	"github.com/teclara/railsix/shared/sentryutil"
 )
 
 func main() {
+	if sentryutil.Init("gtfs-static") {
+		defer sentryutil.Flush()
+	}
+
 	port := config.EnvOr(config.EnvPort, "8081")
 	gtfsURL := config.EnvOr(config.EnvGTFSStaticURL, config.DefaultGTFSStaticURL)
 
@@ -30,9 +36,11 @@ func main() {
 	mux := http.NewServeMux()
 	registerRoutes(mux, static)
 
+	sentryHandler := sentryhttp.New(sentryhttp.Options{Repanic: true})
+
 	srv := &http.Server{
 		Addr:         ":" + port,
-		Handler:      mux,
+		Handler:      sentryHandler.Handle(mux),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,

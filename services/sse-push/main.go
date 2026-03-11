@@ -12,8 +12,10 @@ import (
 	"syscall"
 	"time"
 
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/teclara/railsix/shared/bus"
 	"github.com/teclara/railsix/shared/config"
+	"github.com/teclara/railsix/shared/sentryutil"
 )
 
 // natsToSSE maps NATS subjects to SSE event names.
@@ -34,6 +36,10 @@ type brokerClientCounter interface {
 }
 
 func main() {
+	if sentryutil.Init("sse-push") {
+		defer sentryutil.Flush()
+	}
+
 	natsURL := config.EnvOr(config.EnvNATSURL, config.DefaultNATSURL)
 	port := config.EnvOr(config.EnvPort, "8085")
 	allowedOrigins := parseOrigins(os.Getenv(config.EnvAllowedOrigins))
@@ -65,9 +71,11 @@ func main() {
 	mux.HandleFunc("GET /sse", sseHandler(broker, allowedOrigins))
 	mux.HandleFunc("GET /health", healthHandler(broker, nc))
 
+	sentryHandler := sentryhttp.New(sentryhttp.Options{Repanic: true})
+
 	srv := &http.Server{
 		Addr:        ":" + port,
-		Handler:     mux,
+		Handler:     sentryHandler.Handle(mux),
 		ReadTimeout: 5 * time.Second,
 	}
 

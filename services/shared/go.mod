@@ -3,6 +3,7 @@ module github.com/teclara/railsix/shared
 go 1.25.8
 
 require (
+	github.com/getsentry/sentry-go v0.43.0
 	github.com/nats-io/nats.go v1.49.0
 	github.com/redis/go-redis/v9 v9.18.0
 )
@@ -16,4 +17,5 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/text v0.32.0 // indirect
 )

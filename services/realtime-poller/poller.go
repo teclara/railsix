@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/teclara/railsix/shared/gtfsrt"
 	"github.com/teclara/railsix/shared/metrolinx"
 	"github.com/teclara/railsix/shared/models"
@@ -66,6 +67,7 @@ func pollAll(ctx context.Context, mx *metrolinx.Client, lookup RouteLookup, incl
 		raw, err := fetchAlerts(ctx, mx)
 		if err != nil {
 			slog.Error("poll alerts failed", "error", err)
+			sentry.CaptureException(err)
 			return
 		}
 		enriched := gtfsrt.EnrichAlerts(raw, lookup)
@@ -82,6 +84,7 @@ func pollAll(ctx context.Context, mx *metrolinx.Client, lookup RouteLookup, incl
 		updates, err := fetchTripUpdates(ctx, mx)
 		if err != nil {
 			slog.Error("poll trip updates failed", "error", err)
+			sentry.CaptureException(err)
 			return
 		}
 		result.mu.Lock()
@@ -97,6 +100,7 @@ func pollAll(ctx context.Context, mx *metrolinx.Client, lookup RouteLookup, incl
 		entries, err := mx.GetServiceGlance(ctx)
 		if err != nil {
 			slog.Error("poll service glance failed", "error", err)
+			sentry.CaptureException(err)
 			return
 		}
 		result.mu.Lock()
@@ -112,6 +116,7 @@ func pollAll(ctx context.Context, mx *metrolinx.Client, lookup RouteLookup, incl
 		deps, err := mx.GetUnionDepartures(ctx)
 		if err != nil {
 			slog.Error("poll union departures failed", "error", err)
+			sentry.CaptureException(err)
 			return
 		}
 		result.mu.Lock()
@@ -128,6 +133,7 @@ func pollAll(ctx context.Context, mx *metrolinx.Client, lookup RouteLookup, incl
 			cancelled, err := mx.GetExceptions(ctx)
 			if err != nil {
 				slog.Error("poll exceptions failed", "error", err)
+				sentry.CaptureException(err)
 				return
 			}
 			result.mu.Lock()

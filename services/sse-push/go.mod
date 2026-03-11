@@ -2,7 +2,10 @@ module github.com/teclara/railsix/sse-push
 
 go 1.25.8
 
-require github.com/teclara/railsix/shared v0.0.0
+require (
+	github.com/getsentry/sentry-go v0.43.0
+	github.com/teclara/railsix/shared v0.0.0
+)
 
 require (
 	github.com/klauspost/compress v1.18.2 // indirect
@@ -11,6 +14,7 @@ require (
 	github.com/nats-io/nuid v1.0.1 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/text v0.32.0 // indirect
 )
 
 replace github.com/teclara/railsix/shared => ../shared
