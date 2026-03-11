@@ -15,11 +15,20 @@
 		return t.slice(0, 5);
 	}
 
+	function isWaiting(d: Departure): boolean {
+		return d.status?.toUpperCase() === 'WAIT';
+	}
+
+	function boardPlatformText(d: Departure): string {
+		if (isWaiting(d)) return 'WAIT';
+		return compactPlatform(d.platform || '--');
+	}
+
 	function boardStatusText(d: Departure): string {
 		if (d.isCancelled || d.status === 'Cancelled') return 'CANCELLED';
 		if (d.delayMinutes && d.delayMinutes > 0) return `DLY +${d.delayMinutes}`;
 		const s = d.status?.toUpperCase() ?? '';
-		if (s === 'PROCEED' || s === 'WAIT') return s;
+		if (s === 'PROCEED') return s;
 		return 'ON TIME';
 	}
 
@@ -28,7 +37,6 @@
 		if (d.delayMinutes && d.delayMinutes > 0) return 'text-amber-400';
 		const s = d.status?.toUpperCase() ?? '';
 		if (s === 'PROCEED') return 'text-green-400';
-		if (s === 'WAIT') return 'text-amber-300';
 		return 'text-green-400';
 	}
 
@@ -71,8 +79,8 @@
 				{/each}
 			</span>
 
-			<span class="col-platform text-white">
-				{#each padCenter(compactPlatform(dep.platform || '--'), 5).split('') as char, j}
+			<span class="col-platform text-white" class:text-amber-300={isWaiting(dep)}>
+				{#each padCenter(boardPlatformText(dep), 5).split('') as char, j}
 					<SplitFlapChar value={char} delay={50 + j * 12} />
 				{/each}
 			</span>
