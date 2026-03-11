@@ -52,15 +52,26 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 		sseConns.set(ip, current + 1);
 		const response = await resolve(event);
-		// Decrement when the connection closes
-		response.body
-			?.pipeTo(new WritableStream())
-			.catch(() => {})
-			.finally(() => {
-				const count = (sseConns.get(ip) ?? 1) - 1;
-				if (count <= 0) sseConns.delete(ip);
-				else sseConns.set(ip, count);
-			});
+
+		// Wrap the body to detect close without consuming it
+		const original = response.body;
+		if (original) {
+			const { readable, writable } = new TransformStream();
+			original
+				.pipeTo(writable)
+				.catch(() => {})
+				.finally(() => {
+					const count = (sseConns.get(ip) ?? 1) - 1;
+					if (count <= 0) sseConns.delete(ip);
+					else sseConns.set(ip, count);
+				});
+			return addSecurityHeaders(
+				new Response(readable, {
+					status: response.status,
+					headers: response.headers
+				})
+			);
+		}
 		return addSecurityHeaders(response);
 	}
 
