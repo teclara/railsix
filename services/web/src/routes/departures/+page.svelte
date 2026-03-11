@@ -4,7 +4,6 @@
 		fetchDepartures,
 		fetchNetworkHealth,
 		type Departure,
-		type DeparturesResult,
 		type NetworkLine
 	} from '$lib/api-client';
 	import type { Stop } from '$lib/api';
