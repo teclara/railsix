@@ -1,37 +1,48 @@
+import { env } from '$env/dynamic/private';
 import { error, type Handle } from '@sveltejs/kit';
+import { closeSSE, isRateLimited, openSSE } from '$lib/server/rate-limit';
 
 const RATE_LIMIT = 60; // max requests per window
-const RATE_WINDOW_MS = 60_000; // 1 minute
 const SSE_MAX_PER_IP = 3;
-
-const hits = new Map<string, { count: number; resetAt: number }>();
-const sseConns = new Map<string, number>();
-
-// Clean up stale entries every 5 minutes
-setInterval(() => {
-	const now = Date.now();
-	for (const [ip, entry] of hits) {
-		if (now > entry.resetAt) hits.delete(ip);
-	}
-}, 300_000);
+const ALLOWED_FETCH_SITES = new Set(['same-origin', 'same-site', 'none']);
 
 function getClientIp(event: Parameters<Handle>[0]['event']): string {
-	return (
-		event.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || event.getClientAddress()
-	);
+	const forwardedFor = event.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+
+	if (!env.ADDRESS_HEADER && forwardedFor) {
+		return forwardedFor.replace(/^::ffff:/, '');
+	}
+
+	try {
+		return event.getClientAddress().replace(/^::ffff:/, '');
+	} catch {
+		return forwardedFor?.replace(/^::ffff:/, '') || 'unknown';
+	}
 }
 
-function isRateLimited(ip: string): boolean {
-	const now = Date.now();
-	const entry = hits.get(ip);
-
-	if (!entry || now > entry.resetAt) {
-		hits.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+function isAllowedBrowserApiRequest(event: Parameters<Handle>[0]['event']): boolean {
+	const origin = event.request.headers.get('origin');
+	if (origin && origin !== event.url.origin) {
 		return false;
 	}
 
-	entry.count++;
-	return entry.count > RATE_LIMIT;
+	const referer = event.request.headers.get('referer');
+	if (!origin && referer) {
+		try {
+			if (new URL(referer).origin !== event.url.origin) {
+				return false;
+			}
+		} catch {
+			return false;
+		}
+	}
+
+	const fetchSite = event.request.headers.get('sec-fetch-site');
+	if (fetchSite && !ALLOWED_FETCH_SITES.has(fetchSite)) {
+		return false;
+	}
+
+	return true;
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -42,34 +53,34 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return addSecurityHeaders(response);
 	}
 
+	if (!isAllowedBrowserApiRequest(event)) {
+		throw error(403, 'Cross-origin API requests are not allowed');
+	}
+
 	const ip = getClientIp(event);
 
-	// SSE: limit concurrent connections per IP (no token check — EventSource can't send headers)
+	// SSE: browser same-origin checks apply above; this is best-effort abuse control.
 	if (pathname === '/api/sse') {
-		const current = sseConns.get(ip) ?? 0;
-		if (current >= SSE_MAX_PER_IP) {
+		if (!(await openSSE(ip, SSE_MAX_PER_IP))) {
 			throw error(429, 'Too many SSE connections');
 		}
-		sseConns.set(ip, current + 1);
 
 		// Decrement count when client disconnects — no TransformStream wrapping
 		// which was breaking the SSE stream.
 		event.request.signal.addEventListener('abort', () => {
-			const count = (sseConns.get(ip) ?? 1) - 1;
-			if (count <= 0) sseConns.delete(ip);
-			else sseConns.set(ip, count);
+			void closeSSE(ip);
 		});
 
-		const response = await resolve(event);
-		return addSecurityHeaders(response);
+		try {
+			const response = await resolve(event);
+			return addSecurityHeaders(response);
+		} catch (err) {
+			await closeSSE(ip);
+			throw err;
+		}
 	}
 
-	// API endpoints: require token + rate limit
-	if (event.request.headers.get('X-Requested-With') !== 'de479e2f71a8527f93608d266fcfa32c') {
-		throw error(403, 'Forbidden');
-	}
-
-	if (isRateLimited(ip)) {
+	if (await isRateLimited(ip, RATE_LIMIT)) {
 		throw error(429, 'Too many requests');
 	}
 
@@ -81,6 +92,7 @@ function addSecurityHeaders(response: Response): Response {
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+	response.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
 	response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 	return response;
 }

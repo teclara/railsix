@@ -30,6 +30,16 @@ func NewRedisClient(rc *redis.Client) *RedisClient {
 	return &RedisClient{rc: rc}
 }
 
+// Ping verifies Redis connectivity.
+func (r *RedisClient) Ping(ctx context.Context) error {
+	return r.rc.Ping(ctx).Err()
+}
+
+// GetAge returns how old the timestamp at key is.
+func (r *RedisClient) GetAge(ctx context.Context, key string) (time.Duration, error) {
+	return cache.GetAge(ctx, r.rc, key)
+}
+
 // GetTripUpdate retrieves a trip update from the Redis hash by trip ID.
 func (r *RedisClient) GetTripUpdate(ctx context.Context, tripID string) (gtfsrt.RawTripUpdate, bool) {
 	var update gtfsrt.RawTripUpdate

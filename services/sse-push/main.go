@@ -25,6 +25,14 @@ var natsToSSE = map[string]string{
 	"transit.union-departures": "union-departures",
 }
 
+type natsConnection interface {
+	IsConnected() bool
+}
+
+type brokerClientCounter interface {
+	ClientCount() int
+}
+
 func main() {
 	natsURL := config.EnvOr(config.EnvNATSURL, config.DefaultNATSURL)
 	port := config.EnvOr(config.EnvPort, "8085")
@@ -55,7 +63,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /sse", sseHandler(broker, allowedOrigins))
-	mux.HandleFunc("GET /health", healthHandler(broker))
+	mux.HandleFunc("GET /health", healthHandler(broker, nc))
 
 	srv := &http.Server{
 		Addr:        ":" + port,
@@ -131,12 +139,28 @@ func sseHandler(broker *Broker, allowedOrigins map[string]struct{}) http.Handler
 	}
 }
 
-func healthHandler(broker *Broker) http.HandlerFunc {
+func healthHandler(broker brokerClientCounter, nc natsConnection) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		statusCode := http.StatusOK
+		status := "ok"
+		checks := map[string]any{
+			"nats": map[string]string{"status": "ok"},
+		}
+		if nc == nil || !nc.IsConnected() {
+			statusCode = http.StatusServiceUnavailable
+			status = "error"
+			checks["nats"] = map[string]string{
+				"status":  "error",
+				"message": "nats disconnected",
+			}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(map[string]any{
-			"status":  "ok",
+			"status":  status,
 			"clients": broker.ClientCount(),
+			"checks":  checks,
 		})
 	}
 }

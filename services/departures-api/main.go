@@ -139,17 +139,13 @@ func main() {
 }
 
 func registerRoutes(mux *http.ServeMux, sc *StaticClient, rc *RedisClient, mx *metrolinx.Client) {
-	mux.HandleFunc("GET /health", handleHealth)
+	mux.HandleFunc("GET /health", handleHealth(sc, rc))
 	mux.HandleFunc("GET /stops", handleStops(sc))
 	mux.HandleFunc("GET /departures/{stopCode}", handleDepartures(sc, rc, mx))
 	mux.HandleFunc("GET /union-departures", handleUnionDepartures(rc))
 	mux.HandleFunc("GET /fares/{from}/{to}", handleFares(rc, mx))
 	mux.HandleFunc("GET /network-health", handleNetworkHealth(rc))
 	mux.HandleFunc("GET /alerts", handleAlerts(rc))
-}
-
-func handleHealth(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, map[string]string{"status": "ok"})
 }
 
 func handleStops(sc *StaticClient) http.HandlerFunc {
@@ -394,13 +390,17 @@ func routeAlertTexts(rc *RedisClient, ctx context.Context) map[string]string {
 // --- JSON helpers ---
 
 func respondJSON(w http.ResponseWriter, v any) {
+	respondJSONStatus(w, http.StatusOK, v)
+}
+
+func respondJSONStatus(w http.ResponseWriter, status int, v any) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(status)
 	if _, writeErr := w.Write(data); writeErr != nil {
 		slog.Warn("write response failed", "error", writeErr)
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -28,6 +29,25 @@ func newHTTPRouteLookup(baseURL string) *httpRouteLookup {
 		},
 		cache: make(map[string]models.Route),
 	}
+}
+
+func (l *httpRouteLookup) Ready(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, l.baseURL+"/ready", nil)
+	if err != nil {
+		return fmt.Errorf("build gtfs-static readiness request: %w", err)
+	}
+
+	resp, err := l.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("gtfs-static readiness request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("gtfs-static readiness returned %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 // GetRoute fetches a route by ID, returning a cached result if available.
