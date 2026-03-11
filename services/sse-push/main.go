@@ -112,6 +112,10 @@ func sseHandler(broker *Broker, allowedOrigins map[string]struct{}) http.Handler
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
+
+		// Send immediate keepalive so proxies/clients get first byte fast
+		// instead of waiting up to 15s for the first ticker event.
+		fmt.Fprint(w, ":keepalive\n\n")
 		flusher.Flush()
 
 		ch := broker.Subscribe()
