@@ -4,6 +4,11 @@ type SSEStatusHandler = (connected: boolean) => void;
 const handlers = new Map<string, SSEHandler[]>();
 const statusHandlers: SSEStatusHandler[] = [];
 let eventSource: EventSource | null = null;
+let sseUrl: string | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let stopped = false;
+
+const RECONNECT_INTERVAL_MS = 5000;
 
 function notifyStatus(connected: boolean) {
 	for (const handler of statusHandlers) handler(connected);
@@ -17,14 +22,13 @@ export function onSSEStatus(handler: SSEStatusHandler): () => void {
 	};
 }
 
-export function connectSSE(url: string) {
-	if (eventSource) return;
-	eventSource = new EventSource(url);
+function createEventSource(url: string) {
+	const es = new EventSource(url);
 
-	eventSource.onopen = () => notifyStatus(true);
+	es.onopen = () => notifyStatus(true);
 
 	for (const event of ['alerts', 'union-departures']) {
-		eventSource.addEventListener(event, (e: MessageEvent) => {
+		es.addEventListener(event, (e: MessageEvent) => {
 			let data: unknown;
 			try {
 				data = JSON.parse(e.data);
@@ -38,10 +42,35 @@ export function connectSSE(url: string) {
 		});
 	}
 
-	eventSource.onerror = () => {
-		console.warn('SSE connection lost, auto-reconnecting...');
+	es.onerror = () => {
 		notifyStatus(false);
+		// EventSource with readyState CLOSED won't auto-reconnect (e.g. server returned
+		// non-200). Manually reconnect after a delay.
+		if (es.readyState === EventSource.CLOSED) {
+			console.warn('SSE connection closed by server, reconnecting...');
+			es.close();
+			eventSource = null;
+			scheduleReconnect();
+		}
 	};
+
+	return es;
+}
+
+function scheduleReconnect() {
+	if (stopped || reconnectTimer) return;
+	reconnectTimer = setTimeout(() => {
+		reconnectTimer = null;
+		if (stopped || !sseUrl) return;
+		eventSource = createEventSource(sseUrl);
+	}, RECONNECT_INTERVAL_MS);
+}
+
+export function connectSSE(url: string) {
+	if (eventSource) return;
+	stopped = false;
+	sseUrl = url;
+	eventSource = createEventSource(url);
 }
 
 export function onSSE(event: string, handler: SSEHandler): () => void {
@@ -57,8 +86,14 @@ export function onSSE(event: string, handler: SSEHandler): () => void {
 }
 
 export function disconnectSSE() {
+	stopped = true;
+	if (reconnectTimer) {
+		clearTimeout(reconnectTimer);
+		reconnectTimer = null;
+	}
 	eventSource?.close();
 	eventSource = null;
+	sseUrl = null;
 	handlers.clear();
 	statusHandlers.length = 0;
 }

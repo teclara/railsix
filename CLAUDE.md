@@ -36,6 +36,7 @@ go vet ./shared/...              # vet shared module
 go vet ./gtfs-static/...         # vet a specific service
 go test ./... -v -short           # run all service tests (skip integration)
 go test ./departures-api/... -v   # test a specific service
+go test ./departures-api/... -v -race -short  # match CI (race detector)
 ```
 
 ### Individual Service (dev mode)
@@ -62,7 +63,12 @@ npm run format                    # auto-format with prettier
 npm run build                     # production build
 npx vitest run                    # run all tests
 npx vitest run src/lib/display    # run a single test file
+npm run test:ci                   # CI mode (non-watch)
 ```
+
+### Pre-PR Checklist
+For Go changes: `go vet ./<service>/...` and `go test ./<service>/... -v -race -short`
+For web changes: `npm run test:ci && npm run check && npm run lint && npm run build`
 
 ## Metrolinx API Reference
 
@@ -137,20 +143,28 @@ Key components:
 - `SplitFlapBoard` — commute dashboard board using SplitFlapChar
 - `MyCommute` — commute dashboard with direction toggle, countdown timer, alerts
 
+Server infrastructure:
+- `src/lib/server/rate-limit.ts` — Redis-backed rate limiting with in-memory fallback (60s windows)
+- `src/lib/server/health.ts` — health check hitting api and sse-push with 3s timeout
+
 ## Key Conventions
 
 - Go: stdlib `net/http`, `slog` for logging, no external frameworks. Go workspace (`go.work`) in `services/`
 - External Go deps: `jamespfennell/gtfs` (protobuf), `redis/go-redis`, `nats-io/nats.go`
+- Go tests: use `testing` package, prefer table-driven tests for edge cases
 - Frontend: SvelteKit 2 with Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`). No class components
 - Svelte 5: `{@const}` must be a direct child of block tags (`{#each}`, `{#if}`, etc.), not nested inside `<div>` or other elements
 - Styling: Tailwind CSS 4 via `@tailwindcss/vite` plugin. All palette colors overridden with hex in `app.css` `@theme` block — Tailwind 4 outputs `oklch()` by default which TV browsers (TCL/Google TV) don't support
 - Formatting: Prettier with tabs, single quotes, 100 char width. Run `npm run format` before committing
+- ESLint: disabled rules include `svelte/require-each-key` and `svelte/no-navigation-without-resolve`; `_` prefix allowed for unused vars
 - No user auth — localStorage for favorites and default station
 - Input validation on path params (regex) to prevent traversal
 - SplitFlapChar causes CSS animation lag when used for many characters (80+). Use plain text for variable-length content like meta-lines
 - Metrolinx ServiceGlance returns `"-"` for cars when no data — filter this on the frontend
 - `api-client.ts` fetch functions throw `ApiError` on non-ok responses — callers must handle errors
 - Departures board fullscreen detection uses both Fullscreen API and viewport-vs-screen comparison for TV browsers
+- Commits: Conventional Commit style with scopes, e.g. `fix(web): ...`, `feat: ...`, `style(web): ...`
+- Web adapter: `@sveltejs/adapter-node` (not adapter-auto)
 
 ## Environment Variables
 
@@ -172,6 +186,9 @@ Key components:
 | `API_BASE_URL` | `http://localhost:8082` (dev) | Departures API URL for SSR and proxy |
 | `SSE_PUSH_URL` | `http://localhost:8085` (dev) | SSE push service URL for proxy |
 | `PUBLIC_MAPBOX_TOKEN` | — | Mapbox GL access token |
+| `ADDRESS_HEADER` | — | Reverse proxy client IP header (e.g., `x-forwarded-for`) |
+| `XFF_DEPTH` | — | Trusted proxy hop count |
+| `REDIS_URL` / `REDIS_ADDR` | — | Redis for rate limiting (optional, falls back to in-memory) |
 
 ## Deploy
 
@@ -180,3 +197,12 @@ Railway with Railpack builder. Each service has its own `railway.toml` with `wat
 CI: GitHub Actions in `.github/workflows/` — `api.yml` (all Go services vet + test) and `web.yml` (test, check+lint, build), triggered by path-filtered pushes/PRs.
 
 Local dev: `docker compose up` for full stack, or run individual services with `go run .`.
+
+### Healthcheck Paths
+| Service | Path | Notes |
+|---|---|---|
+| web | `/health` | Checks api + sse-push (503 if any fail) |
+| departures-api | `/health` | |
+| gtfs-static | `/ready` | 420s startup timeout (GTFS ZIP load) |
+| realtime-poller | `/health` | |
+| sse-push | `/health` | |
