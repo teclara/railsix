@@ -132,13 +132,14 @@
 		class="my-commute bg-surface h-[calc(100dvh-60px)] text-white font-mono p-4 flex flex-col gap-3 max-w-xl mx-auto overflow-hidden"
 	>
 		<!-- Header -->
-		<div class="flex items-start justify-between pt-2 shrink-0">
-			<div>
+		<div class="grid grid-cols-[1fr_auto_1fr] items-start pt-2 shrink-0">
+			<div aria-hidden="true"></div>
+			<div class="text-center">
 				<h1 class="text-amber-400 font-bold text-base uppercase tracking-widest">Rail Six</h1>
 				<p class="text-gray-500 text-xs mt-0.5">{greeting()} &middot; {dateStr()}</p>
 			</div>
 			<button
-				class="text-gray-500 hover:text-white text-lg leading-none p-1"
+				class="justify-self-end text-gray-500 hover:text-white text-lg leading-none p-1"
 				onclick={() => (showSettings = true)}
 				aria-label="Settings"
 			>
