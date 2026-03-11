@@ -62,17 +62,29 @@
 		}, 200);
 	}
 
+	function scrollActiveIntoView() {
+		const el = document.getElementById(`${listboxId}-${activeIndex}`);
+		el?.scrollIntoView({ block: 'nearest' });
+	}
+
 	function onKeydown(e: KeyboardEvent) {
+		if (e.key === 'ArrowDown' && !showDropdown) {
+			e.preventDefault();
+			onFocus();
+			return;
+		}
 		if (!showDropdown) return;
 
 		switch (e.key) {
 			case 'ArrowDown':
 				e.preventDefault();
 				activeIndex = activeIndex < results.length - 1 ? activeIndex + 1 : 0;
+				scrollActiveIntoView();
 				break;
 			case 'ArrowUp':
 				e.preventDefault();
 				activeIndex = activeIndex > 0 ? activeIndex - 1 : results.length - 1;
+				scrollActiveIntoView();
 				break;
 			case 'Enter':
 				e.preventDefault();
