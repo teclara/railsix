@@ -53,10 +53,3 @@ export function getUnionDepartures() {
 export function getNetworkHealth() {
 	return fetchApi<unknown[]>(getApiBaseUrl(), '/network-health');
 }
-
-export function getFares(fromCode: string, toCode: string) {
-	return fetchApi<unknown[]>(
-		getApiBaseUrl(),
-		`/fares/${encodeURIComponent(fromCode)}/${encodeURIComponent(toCode)}`
-	);
-}
