@@ -6,5 +6,7 @@ checkSuites = "required"
 
 [deploy]
 startCommand = "/app/out"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5

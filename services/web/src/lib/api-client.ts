@@ -10,11 +10,8 @@ export class ApiError extends Error {
 	}
 }
 
-const API_HEADERS = { 'X-Requested-With': 'de479e2f71a8527f93608d266fcfa32c' };
-
 export async function fetchAlerts(): Promise<Alert[]> {
 	const res = await fetch('/api/alerts', {
-		headers: API_HEADERS,
 		signal: AbortSignal.timeout(10000)
 	});
 	if (!res.ok) throw new ApiError(res.status, `alerts: ${res.status}`);
@@ -48,7 +45,6 @@ export async function fetchDepartures(
 		? `/api/departures/${encodeURIComponent(stopCode)}?dest=${encodeURIComponent(destCode)}`
 		: `/api/departures/${encodeURIComponent(stopCode)}`;
 	const res = await fetch(url, {
-		headers: API_HEADERS,
 		signal: signal ?? AbortSignal.timeout(10000)
 	});
 	if (!res.ok) throw new ApiError(res.status, `departures: ${res.status}`);
@@ -69,7 +65,6 @@ export type UnionDeparture = {
 
 export async function fetchUnionDepartures(): Promise<UnionDeparture[]> {
 	const res = await fetch('/api/union-departures', {
-		headers: API_HEADERS,
 		signal: AbortSignal.timeout(10000)
 	});
 	if (!res.ok) throw new ApiError(res.status, `union-departures: ${res.status}`);
@@ -84,7 +79,6 @@ export type NetworkLine = {
 
 export async function fetchNetworkHealth(): Promise<NetworkLine[]> {
 	const res = await fetch('/api/network-health', {
-		headers: API_HEADERS,
 		signal: AbortSignal.timeout(10000)
 	});
 	if (!res.ok) throw new ApiError(res.status, `network-health: ${res.status}`);
@@ -99,7 +93,6 @@ export type FareInfo = {
 
 export async function fetchFares(from: string, to: string): Promise<FareInfo[]> {
 	const res = await fetch(`/api/fares/${encodeURIComponent(from)}/${encodeURIComponent(to)}`, {
-		headers: API_HEADERS,
 		signal: AbortSignal.timeout(10000)
 	});
 	if (!res.ok) throw new ApiError(res.status, `fares: ${res.status}`);

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -98,6 +99,26 @@ type ScheduleCandidate struct {
 // GetStops proxies the /stops endpoint from gtfs-static, returning raw JSON.
 func (sc *StaticClient) GetStops() ([]byte, error) {
 	return sc.get("/stops")
+}
+
+// Ready checks whether gtfs-static has finished loading its data.
+func (sc *StaticClient) Ready(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sc.baseURL+"/ready", nil)
+	if err != nil {
+		return fmt.Errorf("build gtfs-static readiness request: %w", err)
+	}
+
+	resp, err := sc.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("gtfs-static readiness request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("gtfs-static readiness returned %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 // GetSchedule returns pre-filtered departure candidates for a stop code.

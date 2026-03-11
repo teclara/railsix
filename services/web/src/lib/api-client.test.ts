@@ -33,6 +33,9 @@ describe('api client helpers', () => {
 
 		await expect(fetchAlerts()).resolves.toEqual(alerts);
 		expect(fetchMock).toHaveBeenCalledWith('/api/alerts', expect.any(Object));
+		expect(fetchMock.mock.calls[0]?.[1]).not.toMatchObject({
+			headers: expect.anything()
+		});
 	});
 
 	it('builds departures URLs with optional encoded destination codes', async () => {

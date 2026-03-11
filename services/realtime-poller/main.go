@@ -51,15 +51,12 @@ func main() {
 
 	mx := metrolinx.NewClient(baseURL, apiKey)
 	lookup := newHTTPRouteLookup(gtfsStaticAddr)
+	healthRedis := newRedisReadiness(rc)
 
-	// Minimal health endpoint so Railway can confirm the process is running.
-	healthPort := config.EnvOr("HEALTH_PORT", "8083")
+	healthPort := config.EnvOr(config.EnvPort, config.EnvOr("HEALTH_PORT", "8083"))
 	go func() {
 		mux := http.NewServeMux()
-		mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("ok"))
-		})
+		mux.HandleFunc("GET /health", healthHandler(nc, healthRedis, lookup))
 		slog.Info("health endpoint listening", "port", healthPort)
 		if err := http.ListenAndServe(":"+healthPort, mux); err != nil {
 			slog.Error("health server failed", "error", err)
