@@ -111,6 +111,10 @@ func sseHandler(broker *Broker, allowedOrigins map[string]struct{}) http.Handler
 
 		slog.Info("SSE client connected", "clients", broker.ClientCount())
 
+		// Send keepalive comments every 15s to prevent proxy/LB idle timeouts.
+		keepalive := time.NewTicker(15 * time.Second)
+		defer keepalive.Stop()
+
 		for {
 			select {
 			case <-r.Context().Done():
@@ -118,6 +122,9 @@ func sseHandler(broker *Broker, allowedOrigins map[string]struct{}) http.Handler
 				return
 			case evt := <-ch:
 				fmt.Fprintf(w, "event: %s\ndata: %s\n\n", evt.Name, evt.Data)
+				flusher.Flush()
+			case <-keepalive.C:
+				fmt.Fprint(w, ":keepalive\n\n")
 				flusher.Flush()
 			}
 		}
