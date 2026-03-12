@@ -132,7 +132,7 @@ export function isWaiting(d: Departure): boolean {
 
 export function platformText(d: Departure): string {
 	if (isWaiting(d)) return 'WAIT';
-	return compactPlatform(d.platform || '--');
+	return compactPlatform(d.platform || '---');
 }
 
 export function statusText(d: Departure): string {
