@@ -98,7 +98,7 @@
 	{#each rows as dep, i}
 		<div
 			class="board-row"
-			class:next-train={i === 0 && !isEmpty(dep)}
+			class:next-train={i === 0}
 			class:empty-row={isEmpty(dep)}
 			class:cancelled={dep.isCancelled || dep.status === 'Cancelled'}
 		>
