@@ -175,14 +175,14 @@
 	<CommuteSetup {stops} />
 {:else}
 	<div
-		class="my-commute bg-surface h-[calc(100dvh-60px)] text-white font-mono p-4 flex flex-col gap-3 max-w-xl mx-auto overflow-hidden"
+		class="my-commute bg-surface h-[calc(100dvh-60px)] text-white font-mono px-3 py-4 flex flex-col gap-3 overflow-hidden"
 	>
 		<!-- Header -->
 		<div class="grid grid-cols-[1fr_auto_1fr] items-start pt-2 shrink-0">
 			<div aria-hidden="true"></div>
 			<div class="text-center">
 				<h1 class="text-amber-400 font-bold text-base uppercase tracking-widest">Rail Six</h1>
-				<p class="text-gray-500 text-xs mt-0.5">{greeting()} &middot; {dateStr()}</p>
+				<p class="text-gray-400 text-xs mt-0.5">{greeting()} &middot; {dateStr()}</p>
 			</div>
 			<button
 				class="justify-self-end text-gray-500 hover:text-white text-lg leading-none p-1"
@@ -225,7 +225,7 @@
 
 		<!-- Route header -->
 		<div class="text-center">
-			<p class="text-xs text-gray-500 uppercase tracking-widest">
+			<p class="text-xs text-gray-400 uppercase tracking-widest">
 				{#if activeTrip}
 					{activeTrip.originName} → {activeTrip.destinationName}
 				{:else}
