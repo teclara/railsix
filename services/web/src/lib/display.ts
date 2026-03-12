@@ -2,7 +2,6 @@ import type { Departure } from '$lib/api-client';
 
 const dayMs = 24 * 60 * 60 * 1000;
 const hourMs = 60 * 60 * 1000;
-const minuteMs = 60 * 1000;
 const overnightStartHour = 18;
 const overnightRollHour = 6;
 
