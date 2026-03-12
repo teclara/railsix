@@ -4,13 +4,24 @@
 	let {
 		scheduledTime,
 		originalScheduledTime,
-		size = 'large'
-	}: { scheduledTime: string; originalScheduledTime?: string; size?: 'large' | 'small' } = $props();
+		size = 'large',
+		empty = false
+	}: {
+		scheduledTime: string;
+		originalScheduledTime?: string;
+		size?: 'large' | 'small';
+		empty?: boolean;
+	} = $props();
 
 	let display = $state('--:--');
 	let originalDisplay = $state('');
 
 	function tick() {
+		if (empty) {
+			display = '00:00';
+			originalDisplay = '';
+			return;
+		}
 		display = formatCountdown(scheduledTime);
 		originalDisplay = originalScheduledTime ? formatCountdown(originalScheduledTime) : '';
 	}

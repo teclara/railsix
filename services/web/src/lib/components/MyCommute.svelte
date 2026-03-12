@@ -175,7 +175,7 @@
 	<CommuteSetup {stops} />
 {:else}
 	<div
-		class="my-commute bg-surface h-[calc(100dvh-60px)] text-white font-mono px-3 py-4 flex flex-col gap-3 overflow-hidden"
+		class="my-commute bg-surface h-[calc(100dvh-60px)] text-white font-mono px-3 py-4 flex flex-col gap-3 max-w-lg mx-auto overflow-hidden"
 	>
 		<!-- Header -->
 		<div class="grid grid-cols-[1fr_auto_1fr] items-start pt-2 shrink-0">
@@ -255,16 +255,18 @@
 						? nextDeparture.scheduledTime
 						: undefined}
 				/>
-				{#if followUpDepartures.length > 0}
-					<div class="flex gap-4 mt-1">
-						{#each followUpDepartures as dep}
-							<CountdownTimer scheduledTime={departureDisplayTime(dep)} size="small" />
-						{/each}
-					</div>
-				{/if}
 			{:else}
-				<CountdownTimer scheduledTime="00:00" />
+				<CountdownTimer scheduledTime="" empty />
 			{/if}
+			<div class="flex gap-4 mt-1">
+				{#each Array(4) as _, i}
+					{#if followUpDepartures[i]}
+						<CountdownTimer scheduledTime={departureDisplayTime(followUpDepartures[i])} size="small" />
+					{:else}
+						<CountdownTimer scheduledTime="" size="small" empty />
+					{/if}
+				{/each}
+			</div>
 		</div>
 
 		<footer class="mt-auto pt-2 pb-2 text-center max-w-sm mx-auto shrink-0">
