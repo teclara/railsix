@@ -41,7 +41,6 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@sentry/sveltekit": "^10.43.0",
 		"redis": "^5.11.0"
 	}
 }

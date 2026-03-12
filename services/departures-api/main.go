@@ -13,13 +13,10 @@ import (
 	"time"
 	_ "time/tzdata"
 
-	"github.com/getsentry/sentry-go"
-	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/teclara/railsix/shared/cache"
 	"github.com/teclara/railsix/shared/config"
 	"github.com/teclara/railsix/shared/metrolinx"
 	"github.com/teclara/railsix/shared/models"
-	"github.com/teclara/railsix/shared/sentryutil"
 )
 
 var stopCodeRe = regexp.MustCompile(`^[A-Za-z0-9]{2,10}$`)
@@ -83,10 +80,6 @@ var allLines = []struct {
 }
 
 func main() {
-	if sentryutil.Init("departures-api") {
-		defer sentryutil.Flush()
-	}
-
 	port := config.EnvOr(config.EnvPort, "8082")
 	redisAddr := config.EnvOr(config.EnvRedisAddr, config.DefaultRedisAddr)
 	redisPassword := config.EnvOr(config.EnvRedisPassword, "")
@@ -116,14 +109,12 @@ func main() {
 	mux := http.NewServeMux()
 	registerRoutes(mux, staticClient, redisClient, mx)
 
-	sentryHandler := sentryhttp.New(sentryhttp.Options{Repanic: true})
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	srv := &http.Server{
 		Addr:         ":" + port,
-		Handler:      sentryHandler.Handle(mux),
+		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -197,7 +188,6 @@ func handleDepartures(sc *StaticClient, rc *RedisClient, mx *metrolinx.Client) h
 					rc.SetNextService(r.Context(), stopCode, fetched)
 				} else {
 					slog.Warn("NextService fetch failed", "stopCode", stopCode, "error", err)
-					sentry.CaptureException(err)
 				}
 				nsCancel()
 			}

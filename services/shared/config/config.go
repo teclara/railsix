@@ -16,7 +16,6 @@ const (
 	EnvAllowedOrigins = "ALLOWED_ORIGINS"
 	EnvGTFSStaticURL  = "GTFS_STATIC_URL"
 	EnvGTFSStaticAddr = "GTFS_STATIC_ADDR"
-	EnvSentryDSN      = "SENTRY_DSN"
 )
 
 // Default values for environment variables.

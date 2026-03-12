@@ -16,16 +16,11 @@ import (
 	"github.com/teclara/railsix/shared/config"
 	"github.com/teclara/railsix/shared/metrolinx"
 	"github.com/teclara/railsix/shared/models"
-	"github.com/teclara/railsix/shared/sentryutil"
 )
 
 const cacheTTL = 5 * time.Minute
 
 func main() {
-	if sentryutil.Init("realtime-poller") {
-		defer sentryutil.Flush()
-	}
-
 	apiKey, err := config.Require(config.EnvMetrolinxAPIKey)
 	if err != nil {
 		slog.Error("missing required config", "error", err)
