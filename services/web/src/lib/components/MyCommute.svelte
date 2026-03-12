@@ -223,14 +223,16 @@
 			</button>
 		</div>
 
-		{#if activeTrip}
-			<!-- Route header -->
-			<div class="text-center">
-				<p class="text-xs text-gray-500 uppercase tracking-widest">
+		<!-- Route header -->
+		<div class="text-center">
+			<p class="text-xs text-gray-500 uppercase tracking-widest">
+				{#if activeTrip}
 					{activeTrip.originName} → {activeTrip.destinationName}
-				</p>
-			</div>
-		{/if}
+				{:else}
+					No trip configured
+				{/if}
+			</p>
+		</div>
 
 		<!-- Alert banner -->
 		<AlertBanner {alerts} routeNames={activeRouteNames} />
@@ -245,8 +247,8 @@
 		<SplitFlapBoard {departures} maxRows={5} {tick} fillEmpty />
 
 		<!-- Countdown -->
-		{#if nextDeparture}
-			<div class="flex flex-col items-center gap-1 shrink-0">
+		<div class="flex flex-col items-center gap-1 shrink-0">
+			{#if nextDeparture}
 				<CountdownTimer
 					scheduledTime={departureDisplayTime(nextDeparture)}
 					originalScheduledTime={departureDisplayTime(nextDeparture) !== nextDeparture.scheduledTime
@@ -260,17 +262,10 @@
 						{/each}
 					</div>
 				{/if}
-			</div>
-		{/if}
-
-		{#if !activeTrip}
-			<div class="text-center text-gray-600 text-xs py-12">
-				No trip configured for this direction.<br />
-				<button class="text-amber-400 mt-2" onclick={() => (showSettings = true)}
-					>Set up in settings →</button
-				>
-			</div>
-		{/if}
+			{:else}
+				<CountdownTimer scheduledTime="00:00" />
+			{/if}
+		</div>
 
 		<footer class="mt-auto pt-2 pb-2 text-center max-w-sm mx-auto shrink-0">
 			<p class="text-gray-500 text-[9px] font-mono leading-relaxed">

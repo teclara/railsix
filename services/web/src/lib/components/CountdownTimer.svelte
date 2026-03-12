@@ -31,8 +31,11 @@
 	{#if size === 'large'}
 		<span class="label text-gray-500 text-xs uppercase tracking-widest">Next train in</span>
 	{/if}
-	<span class="time font-mono text-amber-400 tabular-nums" class:time-small={size === 'small'}
-		>{display}</span
+	<span
+		class="time font-mono tabular-nums"
+		class:text-amber-400={display !== '00:00'}
+		class:text-gray-600={display === '00:00'}
+		class:time-small={size === 'small'}>{display}</span
 	>
 	{#if size === 'large' && originalDisplay}
 		<div class="scheduled-line">
