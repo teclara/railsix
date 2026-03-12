@@ -59,7 +59,7 @@
 	});
 
 	let nextDeparture = $derived(upcomingDepartures[0] ?? null);
-	let followUpDepartures = $derived(upcomingDepartures.slice(1, 3));
+	let followUpDepartures = $derived(upcomingDepartures.slice(1, 6));
 
 	async function loadDepartures(trip = activeTrip) {
 		if (!trip) {

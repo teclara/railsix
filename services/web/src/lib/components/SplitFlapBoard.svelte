@@ -16,7 +16,7 @@
 	}
 
 	function boardStatusText(d: Departure): string {
-		if (d.isCancelled || d.status === 'Cancelled') return 'CANCELLED';
+		if (d.isCancelled || d.status === 'Cancelled') return 'CANCEL';
 		if (d.delayMinutes && d.delayMinutes > 0) return `DLY +${d.delayMinutes}`;
 		const s = d.status?.toUpperCase() ?? '';
 		if (s === 'PROCEED') return s;
@@ -71,7 +71,7 @@
 			</span>
 
 			<span class="col-route text-white">
-				{#each padRight(dep.isExpress ? dep.line + ' EXP' : dep.line, 6).split('') as char, j}
+				{#each padRight(dep.isExpress ? dep.line + ' X' : dep.line, 4).split('') as char, j}
 					<SplitFlapChar value={char} delay={ROUTE_DELAY_BASE_MS + j * ROUTE_DELAY_MS} />
 				{/each}
 			</span>
@@ -95,7 +95,7 @@
 			</span>
 
 			<span class="col-status {boardStatusClass(dep)}">
-				{#each padRight(boardStatusText(dep), 9).split('') as char, j}
+				{#each padRight(boardStatusText(dep), 7).split('') as char, j}
 					<SplitFlapChar value={char} delay={STATUS_DELAY_BASE_MS + j * STATUS_DELAY_MS} />
 				{/each}
 			</span>
@@ -122,7 +122,7 @@
 
 	.board-row {
 		display: grid;
-		grid-template-columns: 7.5ch 9ch 4.5ch 7.5ch 7.5ch 16ch;
+		grid-template-columns: 7.5ch 6ch 4.5ch 7.5ch 7.5ch 12ch;
 		gap: 8px;
 		align-items: center;
 		padding: 6px 0;
