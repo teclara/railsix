@@ -115,14 +115,13 @@
 		border-radius: 8px;
 		padding: 16px;
 		width: 100%;
-		max-width: fit-content;
 		margin: 0 auto;
 		overflow: hidden;
 	}
 
 	.board-row {
 		display: grid;
-		grid-template-columns: 7.5ch 6ch 4.5ch 7.5ch 7.5ch 12ch;
+		grid-template-columns: 7fr 5fr 4fr 7fr 7fr 9fr;
 		gap: 8px;
 		align-items: center;
 		padding: 6px 0;

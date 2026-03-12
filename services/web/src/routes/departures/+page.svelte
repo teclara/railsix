@@ -692,7 +692,7 @@
 		border-bottom: 1px solid var(--color-border);
 		color: white;
 		font-family: inherit;
-		font-size: 0.75rem;
+		font-size: 16px;
 		letter-spacing: 0.05em;
 		outline: none;
 	}
