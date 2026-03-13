@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/state';
-	import { browser } from '$app/environment';
+	import { browser, dev } from '$app/environment';
 	import { onMount } from 'svelte';
 	import { track } from '$lib/track';
 	import { connectSSE, disconnectSSE, onSSEStatus } from '$lib/sse';
@@ -168,6 +168,11 @@
 	<meta name="apple-mobile-web-app-title" content="Rail Six" />
 	<link rel="manifest" href="/manifest.json" />
 
+	{#if !dev}
+		<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+		{@html '<script defer src="https://umami.teclara.cloud/script.js" data-website-id="6272cae6-97eb-42a9-bf71-f3b1f2a094f2"><' +
+			'/script>'}
+	{/if}
 	<link rel="canonical" href="https://railsix.com{path}" />
 	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 	{@html '<script type="application/ld+json">' + webAppJsonLd + '<' + '/script>'}
