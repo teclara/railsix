@@ -4,7 +4,24 @@
 </script>
 
 <svelte:head>
-	<title>Rail Six</title>
+	{#if data.urlTrip}
+		<title>{data.urlTrip.fromName} → {data.urlTrip.toName} — Rail Six</title>
+		<meta
+			property="og:title"
+			content="{data.urlTrip.fromName} → {data.urlTrip.toName} — Rail Six"
+		/>
+		<meta
+			property="og:url"
+			content="https://railsix.com/?from={data.urlTrip.fromCode}&to={data.urlTrip.toCode}&dir={data.urlTrip.dir}"
+		/>
+	{:else}
+		<title>Rail Six</title>
+		<meta
+			property="og:title"
+			content="Rail Six — GO Train Schedule & Real-Time Toronto Commute Tracker"
+		/>
+		<meta property="og:url" content="https://railsix.com/" />
+	{/if}
 	<meta
 		name="description"
 		content="Track your GO Train commute in real time. Live departure times, delays, and platform info for all GO Transit stations across the Greater Toronto Area."
@@ -15,15 +32,10 @@
 	/>
 	<meta name="author" content="Teclara Technologies Inc" />
 	<meta
-		property="og:title"
-		content="Rail Six — GO Train Schedule & Real-Time Toronto Commute Tracker"
-	/>
-	<meta
 		property="og:description"
 		content="Track your GO Train commute in real time. Live departure times, delays, and platform info for all GO Transit stations across the Greater Toronto Area."
 	/>
 	<meta property="og:type" content="website" />
-	<meta property="og:url" content="https://railsix.com/" />
 	<meta property="og:image" content="https://railsix.com/train.png" />
 	<meta name="twitter:card" content="summary" />
 	<meta name="twitter:title" content="Rail Six — GO Train Schedule & Toronto Commute Tracker" />
@@ -34,4 +46,4 @@
 	<meta name="twitter:image" content="https://railsix.com/train.png" />
 </svelte:head>
 
-<MyCommute stops={data.stops} alerts={data.alerts} />
+<MyCommute stops={data.stops} alerts={data.alerts} urlTrip={data.urlTrip} />

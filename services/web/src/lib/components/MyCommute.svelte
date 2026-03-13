@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { replaceState } from '$app/navigation';
 	import { commute, getActiveDirection } from '$lib/stores/commute';
 	import type { CommuteStore } from '$lib/stores/commute';
 	import type { Stop } from '$lib/api';
@@ -18,16 +19,43 @@
 	import CommuteSetup from './CommuteSetup.svelte';
 	import SettingsPanel from './SettingsPanel.svelte';
 
-	let { stops, alerts: initialAlerts }: { stops: Stop[]; alerts: Alert[] } = $props();
+	let {
+		stops,
+		alerts: initialAlerts,
+		urlTrip: initialUrlTrip
+	}: {
+		stops: Stop[];
+		alerts: Alert[];
+		urlTrip: {
+			fromCode: string;
+			fromName: string;
+			toCode: string;
+			toName: string;
+			dir: 'toWork' | 'toHome';
+		} | null;
+	} = $props();
+
+	let urlTrip = $state(initialUrlTrip);
+	let isUrlMode = $derived(urlTrip !== null);
 
 	let commuteState = $state<CommuteStore>({ toWork: null, toHome: null });
 	const unsubCommute = commute.subscribe((s) => (commuteState = s));
 
 	let directionOverride = $state<'toWork' | 'toHome' | null>(null);
-	let activeDirection = $derived(getActiveDirection(directionOverride, commuteState));
-	let activeTrip = $derived.by(() =>
-		activeDirection === 'toWork' ? commuteState.toWork : commuteState.toHome
+	let activeDirection = $derived(
+		isUrlMode ? urlTrip!.dir : getActiveDirection(directionOverride, commuteState)
 	);
+	let activeTrip = $derived.by(() => {
+		if (isUrlMode) {
+			return {
+				originCode: urlTrip!.fromCode,
+				originName: urlTrip!.fromName,
+				destinationCode: urlTrip!.toCode,
+				destinationName: urlTrip!.toName
+			};
+		}
+		return activeDirection === 'toWork' ? commuteState.toWork : commuteState.toHome;
+	});
 	const ALERT_REFRESH_INTERVAL_MS = 30_000;
 
 	let departures = $state<Departure[]>([]);
@@ -165,7 +193,7 @@
 
 	let mounted = $state(false);
 	$effect(() => {
-		const trip = activeDirection === 'toWork' ? commuteState.toWork : commuteState.toHome;
+		const trip = activeTrip;
 		if (browser && mounted) {
 			void loadDepartures(trip);
 		}
@@ -185,7 +213,7 @@
 	const activeRouteNames: string[] = [];
 </script>
 
-{#if !commuteState.toWork && !commuteState.toHome}
+{#if !isUrlMode && !commuteState.toWork && !commuteState.toHome}
 	<CommuteSetup {stops} />
 {:else}
 	<div
@@ -215,10 +243,27 @@
 				class:text-black={activeDirection === 'toWork'}
 				class:text-gray-400={activeDirection !== 'toWork'}
 				onclick={() => {
-					directionOverride = 'toWork';
+					if (isUrlMode) {
+						const next = {
+							fromCode: urlTrip!.toCode,
+							fromName: urlTrip!.toName,
+							toCode: urlTrip!.fromCode,
+							toName: urlTrip!.fromName,
+							dir: 'toWork' as const
+						};
+						urlTrip = next;
+						const params = new URLSearchParams({
+							from: next.fromCode,
+							to: next.toCode,
+							dir: 'toWork'
+						});
+						replaceState(`/?${params}`, {});
+					} else {
+						directionOverride = 'toWork';
+					}
 					track('direction-toggle', { direction: 'toWork' });
 				}}
-				disabled={!commuteState.toWork}
+				disabled={!isUrlMode && !commuteState.toWork}
 			>
 				To Work
 			</button>
@@ -228,10 +273,27 @@
 				class:text-black={activeDirection === 'toHome'}
 				class:text-gray-400={activeDirection !== 'toHome'}
 				onclick={() => {
-					directionOverride = 'toHome';
+					if (isUrlMode) {
+						const next = {
+							fromCode: urlTrip!.toCode,
+							fromName: urlTrip!.toName,
+							toCode: urlTrip!.fromCode,
+							toName: urlTrip!.fromName,
+							dir: 'toHome' as const
+						};
+						urlTrip = next;
+						const params = new URLSearchParams({
+							from: next.fromCode,
+							to: next.toCode,
+							dir: 'toHome'
+						});
+						replaceState(`/?${params}`, {});
+					} else {
+						directionOverride = 'toHome';
+					}
 					track('direction-toggle', { direction: 'toHome' });
 				}}
-				disabled={!commuteState.toHome}
+				disabled={!isUrlMode && !commuteState.toHome}
 			>
 				To Home
 			</button>
