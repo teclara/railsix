@@ -265,9 +265,11 @@
 	<meta property="og:type" content="website" />
 	<meta property="og:site_name" content="Rail Six" />
 	<meta property="og:url" content="https://railsix.com/departures/{data.stationSlug}" />
-	<meta property="og:image" content="https://railsix.com/train.png" />
+	<meta property="og:image" content="https://railsix.com/og-image.png" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
 	<meta name="robots" content="index, follow" />
-	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:site" content="@railsix" />
 	<meta
 		name="twitter:title"
@@ -278,7 +280,7 @@
 		content="Live GO Train departures from {selectedStopName ||
 			'Union Station'}. Real-time schedule, platform info, and delay alerts. Free, no account."
 	/>
-	<meta name="twitter:image" content="https://railsix.com/train.png" />
+	<meta name="twitter:image" content="https://railsix.com/og-image.png" />
 </svelte:head>
 
 <div class="board font-mono select-none bg-surface text-white" bind:this={boardEl}>

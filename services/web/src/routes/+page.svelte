@@ -51,10 +51,12 @@
 	<meta name="robots" content="index, follow" />
 	<meta property="og:type" content="website" />
 	<meta property="og:site_name" content="Rail Six" />
-	<meta property="og:image" content="https://railsix.com/train.png" />
-	<meta name="twitter:card" content="summary" />
+	<meta property="og:image" content="https://railsix.com/og-image.png" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:site" content="@railsix" />
-	<meta name="twitter:image" content="https://railsix.com/train.png" />
+	<meta name="twitter:image" content="https://railsix.com/og-image.png" />
 </svelte:head>
 
 <MyCommute stops={data.stops} alerts={data.alerts} />
