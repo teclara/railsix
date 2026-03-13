@@ -47,4 +47,4 @@
 	<meta name="twitter:image" content="https://railsix.com/train.png" />
 </svelte:head>
 
-<MyCommute stops={data.stops} alerts={data.alerts} urlTrip={data.urlTrip} />
+<MyCommute stops={data.stops} alerts={data.alerts} />

@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { replaceState } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { commute, getActiveDirection } from '$lib/stores/commute';
 	import type { CommuteStore } from '$lib/stores/commute';
 	import type { Stop } from '$lib/api';
@@ -19,23 +20,25 @@
 	import CommuteSetup from './CommuteSetup.svelte';
 	import SettingsPanel from './SettingsPanel.svelte';
 
-	let {
-		stops,
-		alerts: initialAlerts,
-		urlTrip: initialUrlTrip
-	}: {
-		stops: Stop[];
-		alerts: Alert[];
-		urlTrip: {
-			fromCode: string;
-			fromName: string;
-			toCode: string;
-			toName: string;
-			dir: 'toWork' | 'toHome';
-		} | null;
-	} = $props();
+	let { stops, alerts: initialAlerts }: { stops: Stop[]; alerts: Alert[] } = $props();
 
-	let urlTrip = $state(initialUrlTrip);
+	// Derive urlTrip from the actual URL — stays in sync with replaceState
+	let urlTrip = $derived.by(() => {
+		const from = $page.url.searchParams.get('from');
+		const to = $page.url.searchParams.get('to');
+		const dir = $page.url.searchParams.get('dir');
+		if (!from || !to || (dir !== 'toWork' && dir !== 'toHome')) return null;
+		const fromStop = stops.find((s) => s.code === from);
+		const toStop = stops.find((s) => s.code === to);
+		if (!fromStop || !toStop) return null;
+		return {
+			fromCode: fromStop.code,
+			fromName: fromStop.name,
+			toCode: toStop.code,
+			toName: toStop.name,
+			dir: dir as 'toWork' | 'toHome'
+		};
+	});
 	let isUrlMode = $derived(urlTrip !== null);
 
 	let commuteState = $state<CommuteStore>({ toWork: null, toHome: null });
@@ -261,17 +264,9 @@
 				class:text-gray-400={activeDirection !== 'toWork'}
 				onclick={() => {
 					if (isUrlMode) {
-						const next = {
-							fromCode: urlTrip!.toCode,
-							fromName: urlTrip!.toName,
-							toCode: urlTrip!.fromCode,
-							toName: urlTrip!.fromName,
-							dir: 'toWork' as const
-						};
-						urlTrip = next;
 						const params = new URLSearchParams({
-							from: next.fromCode,
-							to: next.toCode,
+							from: urlTrip!.toCode,
+							to: urlTrip!.fromCode,
 							dir: 'toWork'
 						});
 						replaceState(`/?${params}`, {});
@@ -294,17 +289,9 @@
 				class:text-gray-400={activeDirection !== 'toHome'}
 				onclick={() => {
 					if (isUrlMode) {
-						const next = {
-							fromCode: urlTrip!.toCode,
-							fromName: urlTrip!.toName,
-							toCode: urlTrip!.fromCode,
-							toName: urlTrip!.fromName,
-							dir: 'toHome' as const
-						};
-						urlTrip = next;
 						const params = new URLSearchParams({
-							from: next.fromCode,
-							to: next.toCode,
+							from: urlTrip!.toCode,
+							to: urlTrip!.fromCode,
 							dir: 'toHome'
 						});
 						replaceState(`/?${params}`, {});
