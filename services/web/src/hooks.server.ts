@@ -68,6 +68,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 		try {
 			const response = await resolve(event);
+			// If the SSE proxy returned a non-streaming error (e.g. 502 upstream
+			// unreachable), the request completes immediately and the abort signal
+			// may never fire — release the slot now instead of leaking it.
+			if (response.headers.get('content-type') !== 'text/event-stream') {
+				await closeSSE(ip);
+			}
 			return addSecurityHeaders(response);
 		} catch (err) {
 			await closeSSE(ip);
