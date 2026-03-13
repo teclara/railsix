@@ -241,38 +241,42 @@
 </script>
 
 <svelte:head>
-	<title>Rail Six — {selectedStopName || 'Union Station'} Departures</title>
+	<title>{selectedStopName || 'Union Station'} GO Train Departures — Live Schedule | Rail Six</title
+	>
 	<meta
 		name="description"
-		content="Live GO Train departure board for {selectedStopName ||
-			'Union Station'} — real-time train schedule, platform assignments, and delay alerts for Toronto GO Transit stations."
+		content="Live GO Train departures from {selectedStopName ||
+			'Union Station'}. Real-time schedule, platform assignments, and delay alerts. Free — no account, no ads, no tracking."
 	/>
 	<meta
 		name="keywords"
-		content="GO Train departures, {selectedStopName ||
-			'Union Station'} schedule, GO Transit train times, Toronto GO Train, real-time departure board, GO station schedule, GTA train tracker"
+		content="GO Train departures {selectedStopName || 'Union Station'}, {selectedStopName ||
+			'Union Station'} GO train schedule, GO train platform, GO Transit real time, GO train delay, GTA train tracker, Toronto GO Transit"
 	/>
 	<meta
 		property="og:title"
-		content="{selectedStopName || 'Union Station'} GO Train Departures & Schedule — Rail Six"
+		content="{selectedStopName || 'Union Station'} GO Train Departures — Live Schedule | Rail Six"
 	/>
 	<meta
 		property="og:description"
-		content="Live GO Train departure board for {selectedStopName ||
-			'Union Station'} — real-time schedule, platforms, and delay alerts."
+		content="Live GO Train departures from {selectedStopName ||
+			'Union Station'}. Real-time schedule, platform assignments, and delay alerts."
 	/>
 	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Rail Six" />
 	<meta property="og:url" content="https://railsix.com/departures/{data.stationSlug}" />
 	<meta property="og:image" content="https://railsix.com/train.png" />
+	<meta name="robots" content="index, follow" />
 	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:site" content="@railsix" />
 	<meta
 		name="twitter:title"
 		content="{selectedStopName || 'Union Station'} GO Train Departures — Rail Six"
 	/>
 	<meta
 		name="twitter:description"
-		content="Live GO Train schedule and departures from {selectedStopName ||
-			'Union Station'}. Real-time delays and platform info."
+		content="Live GO Train departures from {selectedStopName ||
+			'Union Station'}. Real-time schedule, platform info, and delay alerts. Free, no account."
 	/>
 	<meta name="twitter:image" content="https://railsix.com/train.png" />
 </svelte:head>

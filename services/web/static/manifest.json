@@ -1,12 +1,15 @@
 {
+	"id": "/",
 	"name": "Rail Six",
 	"short_name": "Rail Six",
-	"description": "Real-time GO Train schedule and commute tracker for Toronto — free, no ads",
+	"description": "Real-time GO Train departure times, platform info, and delay alerts for GTA commuters. Free — no account, no ads, no tracking.",
 	"start_url": "/",
 	"display": "standalone",
 	"background_color": "#111111",
 	"theme_color": "#111111",
 	"orientation": "portrait-primary",
+	"lang": "en-CA",
+	"categories": ["travel", "utilities"],
 	"icons": [
 		{ "src": "/favicon.ico", "type": "image/x-icon", "sizes": "16x16 32x32" },
 		{ "src": "/icons/icon-192.png", "type": "image/png", "sizes": "192x192" },

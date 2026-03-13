@@ -5,10 +5,22 @@
 
 <svelte:head>
 	{#if data.urlTrip}
-		<title>{data.urlTrip.fromName} → {data.urlTrip.toName} — Rail Six</title>
+		<title
+			>{data.urlTrip.fromName} → {data.urlTrip.toName} GO Train — Live Countdown | Rail Six</title
+		>
+		<meta
+			name="description"
+			content="Live GO Train countdown from {data.urlTrip.fromName} to {data.urlTrip
+				.toName}. Real-time departure times, platform assignments, and delay alerts. Free — no account, no ads, no tracking."
+		/>
 		<meta
 			property="og:title"
-			content="{data.urlTrip.fromName} → {data.urlTrip.toName} — Rail Six"
+			content="{data.urlTrip.fromName} → {data.urlTrip.toName} GO Train — Live Countdown | Rail Six"
+		/>
+		<meta
+			property="og:description"
+			content="Live GO Train countdown from {data.urlTrip.fromName} to {data.urlTrip
+				.toName}. Real-time departures, platform info, and delay alerts."
 		/>
 		<meta
 			property="og:url"
@@ -16,34 +28,32 @@
 				.urlTrip.dir}"
 		/>
 	{:else}
-		<title>Rail Six</title>
+		<title>Real-Time GO Train Departures & Commute Tracker — Rail Six</title>
+		<meta
+			name="description"
+			content="Real-time GO Train departure times, platform info, and delay alerts for the GTA. Save your commute for a live countdown. Free — no account, no ads, no tracking."
+		/>
 		<meta
 			property="og:title"
-			content="Rail Six — GO Train Schedule & Real-Time Toronto Commute Tracker"
+			content="Real-Time GO Train Departures & Commute Tracker — Rail Six"
+		/>
+		<meta
+			property="og:description"
+			content="Real-time GO Train departure times, platform info, and delay alerts for the GTA. Free — no account, no ads, no tracking."
 		/>
 		<meta property="og:url" content="https://railsix.com/" />
 	{/if}
 	<meta
-		name="description"
-		content="Track your GO Train commute in real time. Live departure times, delays, and platform info for all GO Transit stations across the Greater Toronto Area."
-	/>
-	<meta
 		name="keywords"
-		content="GO Train, GO Transit, Toronto train schedule, GO Train times, GTA commute tracker, real-time train tracker, GO Transit departures, Union Station GO, Toronto commuter rail"
+		content="GO Train, GO Transit, GO train real time, GO train departures, GO train platform, GO train countdown, GO train delay, GO Transit schedule, Union Station GO, GTA commute tracker, Toronto commuter rail, GO train no account, GO train tracker"
 	/>
 	<meta name="author" content="Teclara Technologies Inc" />
-	<meta
-		property="og:description"
-		content="Track your GO Train commute in real time. Live departure times, delays, and platform info for all GO Transit stations across the Greater Toronto Area."
-	/>
+	<meta name="robots" content="index, follow" />
 	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Rail Six" />
 	<meta property="og:image" content="https://railsix.com/train.png" />
 	<meta name="twitter:card" content="summary" />
-	<meta name="twitter:title" content="Rail Six — GO Train Schedule & Toronto Commute Tracker" />
-	<meta
-		name="twitter:description"
-		content="Live GO Train departure times, delays, and platform info for your Toronto commute."
-	/>
+	<meta name="twitter:site" content="@railsix" />
 	<meta name="twitter:image" content="https://railsix.com/train.png" />
 </svelte:head>
 

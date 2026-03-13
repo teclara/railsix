@@ -52,9 +52,19 @@
 			name: 'Rail Six',
 			url: 'https://railsix.com',
 			description:
-				'Real-time GO Train schedule and commute tracker for Toronto. Live departure times, delays, and platform info for all GO Transit stations across the Greater Toronto Area.',
+				'Real-time GO Train departure times, platform info, and delay alerts for GTA commuters. No account, no ads, no tracking — just fast, accurate GO Transit data.',
 			applicationCategory: 'TravelApplication',
 			operatingSystem: 'Web',
+			featureList: [
+				'Real-time GO Train departure times',
+				'Platform assignments and track info',
+				'Delay and cancellation alerts',
+				'Bookmarkable commute routes',
+				'Network health at a glance',
+				'No account required',
+				'No advertisements',
+				'No user tracking'
+			],
 			offers: { '@type': 'Offer', price: '0', priceCurrency: 'CAD' },
 			author: { '@type': 'Organization', name: 'Teclara Technologies Inc' },
 			areaServed: { '@type': 'Place', name: 'Greater Toronto Area, Ontario, Canada' }
