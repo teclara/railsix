@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
 	import {
 		fetchDepartures,
 		fetchNetworkHealth,
@@ -7,6 +8,7 @@
 		type NetworkLine
 	} from '$lib/api-client';
 	import type { Stop } from '$lib/api';
+	import { stopToSlug } from '$lib/stations';
 	import SplitFlapChar from '$lib/components/SplitFlapChar.svelte';
 	import {
 		departureDisplayTime,
@@ -20,7 +22,7 @@
 		torontoNow
 	} from '$lib/display';
 
-	let { data }: { data: { stops: Stop[] } } = $props();
+	let { data }: { data: { stops: Stop[]; stationCode: string; stationSlug: string } } = $props();
 
 	let isFullscreen = $state(false);
 	let isMobile = $state(false);
@@ -30,8 +32,6 @@
 	let healthInterval: ReturnType<typeof setInterval>;
 	let networkHealth = $state<NetworkLine[]>([]);
 
-	// Station dropdown — defaults to Union Station
-	let selectedStation = $state('');
 	let dropdownOpen = $state(false);
 	let searchQuery = $state('');
 
@@ -46,8 +46,10 @@
 	);
 
 	let selectedStopName = $derived(
-		data.stops.find((s) => (s.code || s.id) === selectedStation)?.name ?? ''
+		data.stops.find((s) => (s.code || s.id) === data.stationCode)?.name ?? ''
 	);
+
+	let isNonUnion = $derived(data.stationSlug !== 'union');
 
 	function updateClock() {
 		const now = new Date();
@@ -84,9 +86,8 @@
 		const controller = new AbortController();
 		loadController = controller;
 
-		const stopCode = selectedStation || 'UN';
 		try {
-			const result = await fetchDepartures(stopCode, undefined, controller.signal);
+			const result = await fetchDepartures(data.stationCode, undefined, controller.signal);
 			if (controller.signal.aborted) return;
 			allGtfsDepartures = sortByScheduledTime(result.departures);
 			stationAlert = result.stationAlert ?? '';
@@ -99,19 +100,15 @@
 	}
 
 	function selectStation(stop: Stop) {
-		selectedStation = stop.code || stop.id;
-		allGtfsDepartures = [];
 		dropdownOpen = false;
 		searchQuery = '';
-		loadDepartures();
+		goto(`/departures/${stopToSlug(stop)}`);
 	}
 
-	function clearStation() {
-		selectedStation = '';
-		allGtfsDepartures = [];
+	function goUnion() {
 		dropdownOpen = false;
 		searchQuery = '';
-		loadDepartures();
+		goto('/departures/union');
 	}
 
 	async function loadNetworkHealth() {
@@ -166,13 +163,22 @@
 		}
 	});
 
+	// Reload departures when the station changes via navigation
+	$effect(() => {
+		data.stationCode;
+		allGtfsDepartures = [];
+		loadDepartures();
+
+		// Reset poll interval
+		clearInterval(pollInterval);
+		pollInterval = setInterval(loadDepartures, 30_000);
+	});
+
 	let mobileQuery: MediaQueryList;
 
 	onMount(() => {
 		updateClock();
 		clockInterval = setInterval(updateClock, 1000);
-		loadDepartures();
-		pollInterval = setInterval(loadDepartures, 30_000);
 		loadNetworkHealth();
 		healthInterval = setInterval(loadNetworkHealth, 30_000);
 		document.addEventListener('fullscreenchange', onFullscreenChange);
@@ -256,7 +262,7 @@
 			'Union Station'} — real-time schedule, platforms, and delay alerts."
 	/>
 	<meta property="og:type" content="website" />
-	<meta property="og:url" content="https://railsix.com/departures" />
+	<meta property="og:url" content="https://railsix.com/departures/{data.stationSlug}" />
 	<meta property="og:image" content="https://railsix.com/train.png" />
 	<meta name="twitter:card" content="summary" />
 	<meta
@@ -276,9 +282,33 @@
 	{#if !isMobile}
 		<div class="board-header">
 			<div>
-				<h1 class="text-amber-400 font-bold uppercase tracking-[0.2em]" style="font-size: 0.85em;">
-					{selectedStopName || 'Union Station GO'}
-				</h1>
+				{#if !isFullscreen}
+					<button
+						class="station-title-btn"
+						onclick={() => (isNonUnion ? goUnion() : (dropdownOpen = !dropdownOpen))}
+						title={isNonUnion ? 'Back to Union Station' : 'Change station'}
+					>
+						<h1
+							class="text-amber-400 font-bold uppercase tracking-[0.2em]"
+							style="font-size: 0.85em;"
+						>
+							{#if isNonUnion}
+								<span class="station-back-arrow">←</span>
+							{/if}
+							{selectedStopName || 'Union Station GO'}
+							{#if !isNonUnion}
+								<span class="station-caret">▾</span>
+							{/if}
+						</h1>
+					</button>
+				{:else}
+					<h1
+						class="text-amber-400 font-bold uppercase tracking-[0.2em]"
+						style="font-size: 0.85em;"
+					>
+						{selectedStopName || 'Union Station GO'}
+					</h1>
+				{/if}
 				<p class="text-gray-400 tracking-widest uppercase" style="font-size: 0.6em;">Departures</p>
 			</div>
 			{#if networkHealth.length > 0}
@@ -321,84 +351,70 @@
 					{/if}
 				</button>
 			</div>
-			{#if !isFullscreen}<div class="station-picker relative">
-					{#if selectedStation}
-						<button
-							class="uppercase tracking-widest text-amber-400 font-bold flex items-center gap-1"
-							style="font-size: 0.6em;"
-							onclick={clearStation}
-						>
-							{selectedStopName}
-							<span class="text-gray-400">&times;</span>
-						</button>
-					{:else}
-						<button
-							class="uppercase tracking-widest text-gray-400 hover:text-amber-400 transition-colors"
-							style="font-size: 0.6em;"
-							onclick={() => (dropdownOpen = !dropdownOpen)}
-						>
-							Station ▾
-						</button>
-					{/if}
+		</div>
 
-					{#if dropdownOpen}
-						<!-- svelte-ignore a11y_click_events_have_key_events -->
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div class="dropdown-backdrop" onclick={() => (dropdownOpen = false)}></div>
-						<div class="dropdown">
-							<!-- svelte-ignore a11y_autofocus -->
-							<input
-								class="dropdown-search"
-								type="text"
-								placeholder="Search stations..."
-								bind:value={searchQuery}
-								autofocus
-							/>
-							<div class="dropdown-list">
-								{#each filteredStops as stop}
-									<button class="dropdown-item" onclick={() => selectStation(stop)}>
-										{stop.name}
-									</button>
-								{/each}
-								{#if filteredStops.length === 0}
-									<div class="px-3 py-2 text-gray-400 text-xs">No stations found</div>
-								{/if}
-							</div>
+		{#if dropdownOpen}
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="desktop-picker-backdrop" onclick={() => (dropdownOpen = false)}></div>
+			<div class="desktop-picker">
+				<div class="desktop-picker-header">
+					<h2 class="text-amber-400 uppercase tracking-widest font-bold" style="font-size: 0.7em;">
+						Select Station
+					</h2>
+					<button
+						class="text-gray-400 hover:text-white leading-none"
+						style="font-size: 1.2em;"
+						onclick={() => (dropdownOpen = false)}
+					>
+						&times;
+					</button>
+				</div>
+				<!-- svelte-ignore a11y_autofocus -->
+				<input
+					class="desktop-picker-search"
+					type="text"
+					placeholder="Search stations..."
+					bind:value={searchQuery}
+					autofocus
+				/>
+				<div class="desktop-picker-list">
+					{#each filteredStops as stop}
+						<button class="desktop-picker-item" onclick={() => selectStation(stop)}>
+							{stop.name}
+						</button>
+					{/each}
+					{#if filteredStops.length === 0}
+						<div class="text-gray-400 text-center py-4" style="font-size: 14px;">
+							No stations found
 						</div>
 					{/if}
-				</div>{/if}
-		</div>
+				</div>
+			</div>
+		{/if}
 	{:else}
 		<!-- Header: Mobile -->
 		<div class="mobile-header">
 			<div class="mobile-header-top">
-				<div>
+				<button
+					class="station-title-btn-mobile"
+					onclick={() => (isNonUnion ? goUnion() : (dropdownOpen = !dropdownOpen))}
+					title={isNonUnion ? 'Back to Union Station' : 'Change station'}
+				>
 					<h1 class="text-amber-400 font-bold uppercase tracking-wider text-base">
+						{#if isNonUnion}
+							<span class="station-back-arrow">←</span>
+						{/if}
 						{selectedStopName || 'Union Station GO'}
+						{#if !isNonUnion}
+							<span class="station-caret text-gray-400">▾</span>
+						{/if}
 					</h1>
 					<p class="text-gray-400 tracking-widest uppercase text-[10px] mt-0.5">Departures</p>
-				</div>
+				</button>
 				<div class="text-amber-400 tracking-widest tabular-nums text-lg">
 					{clock}
 				</div>
-			</div>
-			<div>
-				{#if selectedStation}
-					<button
-						class="uppercase tracking-widest text-amber-400 font-bold flex items-center gap-1 text-xs py-1"
-						onclick={clearStation}
-					>
-						{selectedStopName}
-						<span class="text-gray-400">&times;</span>
-					</button>
-				{:else}
-					<button
-						class="uppercase tracking-widest text-gray-400 hover:text-amber-400 transition-colors text-xs py-1"
-						onclick={() => (dropdownOpen = !dropdownOpen)}
-					>
-						Station ▾
-					</button>
-				{/if}
 			</div>
 
 			{#if dropdownOpen}
@@ -826,35 +842,100 @@
 		}
 	}
 
-	/* ── Station dropdown ── */
-	.station-picker {
-		position: relative;
+	/* ── Station title picker ── */
+	.station-title-btn {
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		text-align: left;
+		font-family: inherit;
+		color: inherit;
 	}
 
-	.dropdown-backdrop {
+	.station-title-btn:hover h1 {
+		text-decoration: underline;
+		text-decoration-color: var(--color-muted);
+		text-underline-offset: 0.2em;
+		text-decoration-thickness: 1px;
+	}
+
+	.station-title-btn-mobile {
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		text-align: left;
+		font-family: inherit;
+		color: inherit;
+	}
+
+	.station-caret {
+		font-size: 0.7em;
+		color: var(--color-muted);
+		transition: color 0.15s;
+	}
+
+	.station-title-btn:hover .station-caret,
+	.station-title-btn-mobile:hover .station-caret {
+		color: var(--color-accent);
+	}
+
+	.station-back-arrow {
+		color: var(--color-muted);
+		margin-right: 0.15em;
+		transition: color 0.15s;
+	}
+
+	.station-title-btn:hover .station-back-arrow,
+	.station-title-btn-mobile:hover .station-back-arrow {
+		color: var(--color-accent);
+	}
+
+	/* ── Desktop station picker overlay ── */
+	.desktop-picker-backdrop {
 		position: fixed;
 		inset: 0;
-		z-index: 40;
+		background: rgba(0, 0, 0, 0.7);
+		z-index: 60;
 	}
 
-	.dropdown {
-		position: absolute;
-		right: 0;
-		top: 100%;
-		width: 260px;
-		background: var(--color-surface-overlay);
-		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		z-index: 50;
-		overflow: hidden;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-		font-size: 14px; /* dropdown stays fixed size */
-	}
-
-	.dropdown-search {
-		width: 100%;
-		padding: 8px 12px;
+	.desktop-picker {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		z-index: 61;
 		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: 12px;
+		width: 380px;
+		max-height: 70dvh;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8);
+		font-size: 16px;
+	}
+
+	.desktop-picker-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 16px 20px 8px;
+	}
+
+	.desktop-picker-header button {
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-family: inherit;
+	}
+
+	.desktop-picker-search {
+		width: 100%;
+		padding: 12px 20px;
+		background: var(--color-surface-overlay);
 		border: none;
 		border-bottom: 1px solid var(--color-border);
 		color: white;
@@ -864,23 +945,24 @@
 		outline: none;
 	}
 
-	.dropdown-search::placeholder {
+	.desktop-picker-search::placeholder {
 		color: var(--color-muted);
 		text-transform: uppercase;
 	}
 
-	.dropdown-list {
-		max-height: 240px;
+	.desktop-picker-list {
+		flex: 1;
 		overflow-y: auto;
 	}
 
-	.dropdown-item {
+	.desktop-picker-item {
 		display: block;
 		width: 100%;
 		text-align: left;
-		padding: 8px 12px;
+		padding: 10px 20px;
 		background: none;
 		border: none;
+		border-bottom: 1px solid var(--color-border-subtle);
 		color: var(--color-dim);
 		font-family: inherit;
 		font-size: 14px;
@@ -890,20 +972,20 @@
 		transition: background 0.1s;
 	}
 
-	.dropdown-item:hover {
+	.desktop-picker-item:hover {
 		background: var(--color-surface-hover);
 		color: var(--color-accent);
 	}
 
-	.dropdown-list::-webkit-scrollbar {
+	.desktop-picker-list::-webkit-scrollbar {
 		width: 4px;
 	}
 
-	.dropdown-list::-webkit-scrollbar-track {
+	.desktop-picker-list::-webkit-scrollbar-track {
 		background: var(--color-surface-overlay);
 	}
 
-	.dropdown-list::-webkit-scrollbar-thumb {
+	.desktop-picker-list::-webkit-scrollbar-thumb {
 		background: var(--color-border-input);
 		border-radius: 2px;
 	}
