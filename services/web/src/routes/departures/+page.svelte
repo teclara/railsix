@@ -202,7 +202,6 @@
 		stops?: string[];
 	}): MetaPart[] {
 		const parts: MetaPart[] = [];
-		if (dep.isInMotion) parts.push({ text: 'EN ROUTE', cls: 'text-green-400' });
 		if (dep.stops && dep.stops.length > 0)
 			parts.push({ text: dep.stops.join(' · '), cls: 'text-gray-400' });
 		return parts;
@@ -276,7 +275,7 @@
 	<meta name="twitter:image" content="https://railsix.com/train.png" />
 </svelte:head>
 
-<div class="board font-mono select-none bg-surface-inset text-white" bind:this={boardEl}>
+<div class="board font-mono select-none bg-surface text-white" bind:this={boardEl}>
 	<!-- Header: Desktop -->
 	{#if !isMobile}
 		<div class="board-header">
