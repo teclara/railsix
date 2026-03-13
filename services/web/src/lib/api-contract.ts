@@ -27,6 +27,7 @@ export interface Departure {
 	isExpress?: boolean;
 	alert?: string;
 	routeType?: number;
+	tripNumber?: string;
 }
 
 export interface DeparturesResult {

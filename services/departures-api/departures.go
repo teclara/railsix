@@ -84,7 +84,7 @@ func GetDepartures(ctx context.Context, stopCode, destCode string, now time.Time
 		scheduled := serviceDay.Add(time.Duration(c.DepartureNano))
 
 		update, ok := findTripUpdate(tripUpdates, c.TripID)
-		delay := findDelay(update, ok, c.StopID)
+		delay := normalizeDepartureDelay(findDelay(update, ok, c.StopID))
 		adjusted := scheduled.Add(delay)
 		delayMin := int(delay.Minutes())
 
@@ -123,7 +123,7 @@ func GetDepartures(ctx context.Context, stopCode, destCode string, now time.Time
 			dep.Cars = sg.Cars
 			dep.IsInMotion = sg.IsInMotion
 			if dep.Status != "Cancelled" && delay == 0 && sg.DelaySeconds != 0 {
-				sgDelay := time.Duration(sg.DelaySeconds) * time.Second
+				sgDelay := normalizeDepartureDelay(time.Duration(sg.DelaySeconds) * time.Second)
 				adjusted = scheduled.Add(sgDelay)
 				delayMin = int(sgDelay.Minutes())
 				dep.DelayMinutes = delayMin
@@ -207,10 +207,14 @@ func departureStatus(hasUpdate bool, scheduleRelationship string, delayMin int) 
 	if delayMin >= 1 {
 		return fmt.Sprintf("Delayed +%dm", delayMin)
 	}
-	if delayMin <= -1 {
-		return fmt.Sprintf("Early %dm", -delayMin)
-	}
 	return "On Time"
+}
+
+func normalizeDepartureDelay(delay time.Duration) time.Duration {
+	if delay < 0 {
+		return -delay
+	}
+	return delay
 }
 
 // formatTime returns "HH:MM" in local time.

@@ -69,6 +69,50 @@
 		);
 	}
 
+	function departureKey(dep: Departure): string {
+		return [dep.tripNumber || dep.line, dep.scheduledTime, dep.lineName || ''].join('|');
+	}
+
+	function sameStringList(a?: string[], b?: string[]): boolean {
+		if (a === b) return true;
+		if (!a || !b) return !a && !b;
+		if (a.length !== b.length) return false;
+		for (let i = 0; i < a.length; i++) {
+			if (a[i] !== b[i]) return false;
+		}
+		return true;
+	}
+
+	function sameDeparture(a: Departure, b: Departure): boolean {
+		return (
+			a.line === b.line &&
+			a.lineName === b.lineName &&
+			a.scheduledTime === b.scheduledTime &&
+			a.actualTime === b.actualTime &&
+			a.arrivalTime === b.arrivalTime &&
+			a.status === b.status &&
+			a.platform === b.platform &&
+			a.delayMinutes === b.delayMinutes &&
+			a.lastStopCode === b.lastStopCode &&
+			a.cars === b.cars &&
+			a.isInMotion === b.isInMotion &&
+			a.isCancelled === b.isCancelled &&
+			a.isExpress === b.isExpress &&
+			a.alert === b.alert &&
+			a.routeType === b.routeType &&
+			a.tripNumber === b.tripNumber &&
+			sameStringList(a.stops, b.stops)
+		);
+	}
+
+	function reconcileDepartures(previous: Departure[], next: Departure[]): Departure[] {
+		const prevByKey = new Map(previous.map((dep) => [departureKey(dep), dep]));
+		return next.map((dep) => {
+			const prev = prevByKey.get(departureKey(dep));
+			return prev && sameDeparture(prev, dep) ? prev : dep;
+		});
+	}
+
 	let allGtfsDepartures = $state<Departure[]>([]);
 	let stationAlert = $state('');
 	let fetchError = $state(false);
@@ -88,7 +132,8 @@
 		try {
 			const result = await fetchDepartures(stopCode, undefined, controller.signal);
 			if (controller.signal.aborted) return;
-			allGtfsDepartures = sortByScheduledTime(result.departures);
+			const sorted = sortByScheduledTime(result.departures);
+			allGtfsDepartures = reconcileDepartures(allGtfsDepartures, sorted);
 			stationAlert = result.stationAlert ?? '';
 			fetchError = false;
 		} catch (err) {
@@ -469,7 +514,7 @@
 	{/if}
 
 	<div class="rows">
-		{#each trainDepartures as dep}
+		{#each trainDepartures as dep (departureKey(dep))}
 			{@const metaParts = buildMetaParts(dep)}
 			<div class="departure-row" class:cancelled={dep.isCancelled}>
 				<div class="flap-row-station">

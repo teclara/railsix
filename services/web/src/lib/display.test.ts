@@ -63,17 +63,17 @@ describe('display helpers', () => {
 		expect(formatCountdown('00:15', lateNightNow)).toBe('00:25:00');
 	});
 
-	it('handles early departures as real adjusted times', () => {
-		const early = {
+	it('treats negative realtime values as delayed departures', () => {
+		const delayed = {
 			line: 'LW',
 			scheduledTime: '08:15',
 			delayMinutes: -3,
-			status: 'Early 3m'
+			status: 'Delayed +3m'
 		} satisfies Departure;
 
-		expect(departureDisplayTime(early)).toBe('08:12');
-		expect(statusText(early)).toBe('EARLY 3');
-		expect(statusClass(early)).toBe('text-sky-400');
+		expect(departureDisplayTime(delayed)).toBe('08:18');
+		expect(statusText(delayed)).toBe('DLY +3');
+		expect(statusClass(delayed)).toBe('text-amber-400');
 	});
 
 	it('does not wrap ordinary past departures to the next day', () => {

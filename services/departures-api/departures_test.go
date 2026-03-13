@@ -104,11 +104,11 @@ func TestIsStopCancelledUsesStopCodes(t *testing.T) {
 	}
 }
 
-func TestDepartureStatusHandlesEarlyTrips(t *testing.T) {
-	if got := departureStatus(true, "", -4); got != "Early 4m" {
-		t.Fatalf("expected early status, got %q", got)
+func TestDepartureStatusTreatsNegativeRealtimeValuesAsDelays(t *testing.T) {
+	if got := departureStatus(true, "", int(normalizeDepartureDelay(-4*time.Minute).Minutes())); got != "Delayed +4m" {
+		t.Fatalf("expected delayed status, got %q", got)
 	}
-	if got := departureStatus(true, "CANCELED", -4); got != "Cancelled" {
+	if got := departureStatus(true, "CANCELED", int(normalizeDepartureDelay(-4*time.Minute).Minutes())); got != "Cancelled" {
 		t.Fatalf("expected cancellation to take precedence, got %q", got)
 	}
 }
