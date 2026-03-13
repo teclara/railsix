@@ -37,6 +37,7 @@ func main() {
 	natsURL := config.EnvOr(config.EnvNATSURL, config.DefaultNATSURL)
 	port := config.EnvOr(config.EnvPort, "8085")
 	allowedOrigins := parseOrigins(os.Getenv(config.EnvAllowedOrigins))
+	maxSSEClients := config.EnvOrInt("MAX_SSE_CLIENTS", 250)
 
 	// Connect to NATS.
 	nc, err := bus.Connect(natsURL)
@@ -48,6 +49,7 @@ func main() {
 	slog.Info("connected to NATS", "url", natsURL)
 
 	broker := NewBroker()
+	slog.Info("configured SSE client cap", "max", maxSSEClients)
 
 	// Subscribe to each NATS subject and fan out to the broker.
 	for subject, eventName := range natsToSSE {
@@ -62,13 +64,17 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /sse", sseHandler(broker, allowedOrigins))
-	mux.HandleFunc("GET /health", healthHandler(broker, nc))
+	mux.HandleFunc("GET /sse", sseHandler(broker, allowedOrigins, maxSSEClients))
+	mux.HandleFunc("GET /health", livenessHandler())
+	mux.HandleFunc("GET /ready", readinessHandler(broker, nc, maxSSEClients))
 
 	srv := &http.Server{
-		Addr:        ":" + port,
-		Handler:     mux,
-		ReadTimeout: 5 * time.Second,
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadTimeout:       5 * time.Second,
+		ReadHeaderTimeout: 3 * time.Second,
+		IdleTimeout:       30 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	// Graceful shutdown.
@@ -93,7 +99,11 @@ func main() {
 	}
 }
 
-func sseHandler(broker *Broker, allowedOrigins map[string]struct{}) http.HandlerFunc {
+func sseHandler(
+	broker *Broker,
+	allowedOrigins map[string]struct{},
+	maxClients int,
+) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -118,7 +128,12 @@ func sseHandler(broker *Broker, allowedOrigins map[string]struct{}) http.Handler
 		fmt.Fprint(w, ":keepalive\n\n")
 		flusher.Flush()
 
-		ch := broker.Subscribe()
+		ch, ok := broker.TrySubscribe(maxClients)
+		if !ok {
+			w.Header().Set("Retry-After", "5")
+			http.Error(w, "sse capacity reached", http.StatusServiceUnavailable)
+			return
+		}
 		defer broker.Unsubscribe(ch)
 
 		slog.Info("SSE client connected", "clients", broker.ClientCount())
@@ -143,13 +158,28 @@ func sseHandler(broker *Broker, allowedOrigins map[string]struct{}) http.Handler
 	}
 }
 
-func healthHandler(broker brokerClientCounter, nc natsConnection) http.HandlerFunc {
+func livenessHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status": "ok",
+		})
+	}
+}
+
+func readinessHandler(
+	broker brokerClientCounter,
+	nc natsConnection,
+	maxClients int,
+) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		statusCode := http.StatusOK
 		status := "ok"
 		checks := map[string]any{
 			"nats": map[string]string{"status": "ok"},
 		}
+		clientCount := broker.ClientCount()
 		if nc == nil || !nc.IsConnected() {
 			statusCode = http.StatusServiceUnavailable
 			status = "error"
@@ -158,13 +188,27 @@ func healthHandler(broker brokerClientCounter, nc natsConnection) http.HandlerFu
 				"message": "nats disconnected",
 			}
 		}
+		checks["sse"] = map[string]any{
+			"status":     "ok",
+			"clients":    clientCount,
+			"maxClients": maxClients,
+		}
+		if maxClients > 0 && clientCount >= maxClients {
+			statusCode = http.StatusServiceUnavailable
+			status = "error"
+			checks["sse"] = map[string]any{
+				"status":     "error",
+				"message":    "sse client capacity reached",
+				"clients":    clientCount,
+				"maxClients": maxClients,
+			}
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(map[string]any{
-			"status":  status,
-			"clients": broker.ClientCount(),
-			"checks":  checks,
+			"status": status,
+			"checks": checks,
 		})
 	}
 }

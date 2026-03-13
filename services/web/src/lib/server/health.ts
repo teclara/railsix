@@ -10,7 +10,7 @@ interface DependencyCheck {
 
 export interface WebHealthResponse {
 	status: DependencyStatus;
-	checks: Record<string, DependencyCheck>;
+	checks?: Record<string, DependencyCheck>;
 }
 
 function getApiBaseUrl() {
@@ -43,7 +43,7 @@ async function checkDependency(
 	}
 
 	try {
-		const response = await fetchImpl(`${baseUrl}/health`, {
+		const response = await fetchImpl(`${baseUrl}/ready`, {
 			signal: AbortSignal.timeout(3000)
 		});
 		if (!response.ok) {
@@ -61,7 +61,16 @@ async function checkDependency(
 	}
 }
 
-export async function getWebHealth(
+export async function getPublicHealth(): Promise<{ status: number; body: WebHealthResponse }> {
+	return {
+		status: 200,
+		body: {
+			status: 'ok'
+		}
+	};
+}
+
+export async function getInternalHealth(
 	fetchImpl: typeof fetch = fetch
 ): Promise<{ status: number; body: WebHealthResponse }> {
 	const results = await Promise.all([
@@ -79,4 +88,17 @@ export async function getWebHealth(
 			checks
 		}
 	};
+}
+
+export function isInternalHealthHost(hostname: string): boolean {
+	if (dev && (hostname === 'localhost' || hostname === '127.0.0.1')) {
+		return true;
+	}
+
+	const privateDomain = env.RAILWAY_PRIVATE_DOMAIN?.trim();
+	if (privateDomain && hostname === privateDomain) {
+		return true;
+	}
+
+	return hostname.endsWith('.railway.internal');
 }

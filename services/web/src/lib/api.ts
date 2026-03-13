@@ -1,5 +1,6 @@
 import { env } from '$env/dynamic/private';
 import { dev } from '$app/environment';
+import type { Alert, DeparturesResult, NetworkLine, Stop, UnionDeparture } from './api-contract';
 
 function getApiBaseUrl() {
 	const url = env.API_BASE_URL || (dev ? 'http://localhost:8082' : '');
@@ -19,18 +20,6 @@ async function fetchApi<T>(baseUrl: string, path: string): Promise<T> {
 	return res.json();
 }
 
-export interface Stop {
-	id: string;
-	code: string;
-	name: string;
-}
-
-export interface Alert {
-	headline: string;
-	description: string;
-	routeNames?: string[];
-}
-
 export function getAllStops() {
 	return fetchApi<Stop[]>(getApiBaseUrl(), '/stops');
 }
@@ -39,7 +28,7 @@ export function getStopDepartures(stopCode: string, destCode?: string) {
 	const path = destCode
 		? `/departures/${encodeURIComponent(stopCode)}?dest=${encodeURIComponent(destCode)}`
 		: `/departures/${encodeURIComponent(stopCode)}`;
-	return fetchApi<unknown[]>(getApiBaseUrl(), path);
+	return fetchApi<DeparturesResult>(getApiBaseUrl(), path);
 }
 
 export function getAlerts() {
@@ -47,9 +36,11 @@ export function getAlerts() {
 }
 
 export function getUnionDepartures() {
-	return fetchApi<unknown[]>(getApiBaseUrl(), '/union-departures');
+	return fetchApi<UnionDeparture[]>(getApiBaseUrl(), '/union-departures');
 }
 
 export function getNetworkHealth() {
-	return fetchApi<unknown[]>(getApiBaseUrl(), '/network-health');
+	return fetchApi<NetworkLine[]>(getApiBaseUrl(), '/network-health');
 }
+
+export type { Alert, DeparturesResult, NetworkLine, Stop, UnionDeparture } from './api-contract';

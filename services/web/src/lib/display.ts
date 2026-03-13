@@ -65,7 +65,7 @@ export function shiftHHMM(hhmm: string, minutes: number): string {
 
 export function departureDisplayTime(d: Departure): string {
 	if (d.actualTime) return d.actualTime;
-	if (d.delayMinutes && d.delayMinutes > 0) {
+	if (d.delayMinutes && d.delayMinutes !== 0) {
 		return shiftHHMM(d.scheduledTime, d.delayMinutes);
 	}
 	return d.scheduledTime;
@@ -134,6 +134,7 @@ export function platformText(d: Departure): string {
 export function statusText(d: Departure): string {
 	if (d.isCancelled || d.status === 'Cancelled') return 'CANCEL';
 	if (d.delayMinutes && d.delayMinutes > 0) return `DLY +${d.delayMinutes}`;
+	if (d.delayMinutes && d.delayMinutes < 0) return `EARLY ${Math.abs(d.delayMinutes)}`;
 	const s = d.status?.toUpperCase() ?? '';
 	if (s === 'PROCEED') return s;
 	return 'ON TIME';
@@ -142,6 +143,7 @@ export function statusText(d: Departure): string {
 export function statusClass(d: Departure): string {
 	if (d.isCancelled || d.status === 'Cancelled') return 'text-red-500';
 	if (d.delayMinutes && d.delayMinutes > 0) return 'text-amber-400';
+	if (d.delayMinutes && d.delayMinutes < 0) return 'text-sky-400';
 	const s = d.status?.toUpperCase() ?? '';
 	if (s === 'PROCEED') return 'text-green-400';
 	return 'text-green-400';

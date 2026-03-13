@@ -92,4 +92,23 @@ describe('web hook API protections', () => {
 
 		expect(resolve).not.toHaveBeenCalled();
 	});
+
+	it('rate limits each API bucket independently', async () => {
+		const resolve = vi.fn().mockResolvedValue(new Response('ok'));
+		const departuresEvent = makeEvent('/api/departures/UN', {
+			origin: 'https://railsix.com',
+			'sec-fetch-site': 'same-origin'
+		}) as never;
+		const alertsEvent = makeEvent('/api/alerts', {
+			origin: 'https://railsix.com',
+			'sec-fetch-site': 'same-origin'
+		}) as never;
+
+		for (let i = 0; i < 30; i++) {
+			await handle({ event: alertsEvent, resolve });
+		}
+
+		await expect(handle({ event: alertsEvent, resolve })).rejects.toMatchObject({ status: 429 });
+		await expect(handle({ event: departuresEvent, resolve })).resolves.toBeInstanceOf(Response);
+	});
 });

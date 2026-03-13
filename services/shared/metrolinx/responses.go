@@ -15,14 +15,20 @@ import (
 type nextServiceResponse struct {
 	NextService struct {
 		Lines []struct {
+			StopCode               string  `json:"StopCode"`
 			LineCode               string  `json:"LineCode"`
 			LineName               string  `json:"LineName"`
+			ServiceType            string  `json:"ServiceType"`
+			DirectionCode          string  `json:"DirectionCode"`
 			DirectionName          string  `json:"DirectionName"`
 			ScheduledDepartureTime string  `json:"ScheduledDepartureTime"`
 			ComputedDepartureTime  string  `json:"ComputedDepartureTime"`
+			DepartureStatus        string  `json:"DepartureStatus"`
 			ScheduledPlatform      string  `json:"ScheduledPlatform"`
 			ActualPlatform         string  `json:"ActualPlatform"`
+			TripOrder              int     `json:"TripOrder"`
 			TripNumber             string  `json:"TripNumber"`
+			UpdateTime             string  `json:"UpdateTime"`
 			Status                 string  `json:"Status"`
 			Latitude               float64 `json:"Latitude"`
 			Longitude              float64 `json:"Longitude"`
@@ -62,15 +68,24 @@ func (c *Client) GetNextService(ctx context.Context, stopCode string) ([]models.
 	for _, l := range resp.NextService.Lines {
 		status := parseStatus(l.Status, l.Latitude, l.Longitude)
 		lines = append(lines, models.NextServiceLine{
-			LineCode:       l.LineCode,
-			LineName:       l.LineName,
-			Direction:      l.DirectionName,
-			ScheduledTime:  parseMetrolinxTime(l.ScheduledDepartureTime),
-			ComputedTime:   parseMetrolinxTime(l.ComputedDepartureTime),
-			Platform:       strings.TrimSpace(l.ScheduledPlatform),
-			ActualPlatform: strings.TrimSpace(l.ActualPlatform),
-			TripNumber:     l.TripNumber,
-			Status:         status,
+			StopCode:        l.StopCode,
+			LineCode:        l.LineCode,
+			LineName:        l.LineName,
+			ServiceType:     l.ServiceType,
+			DirectionCode:   strings.TrimSpace(l.DirectionCode),
+			Direction:       l.DirectionName,
+			ScheduledTime:   parseMetrolinxTime(l.ScheduledDepartureTime),
+			ComputedTime:    parseMetrolinxTime(l.ComputedDepartureTime),
+			DepartureStatus: l.DepartureStatus,
+			Platform:        strings.TrimSpace(l.ScheduledPlatform),
+			ActualPlatform:  strings.TrimSpace(l.ActualPlatform),
+			TripOrder:       l.TripOrder,
+			TripNumber:      l.TripNumber,
+			Status:          status,
+			RawStatus:       l.Status,
+			UpdateTime:      l.UpdateTime,
+			Lat:             l.Latitude,
+			Lon:             l.Longitude,
 		})
 	}
 	return lines, nil
@@ -119,14 +134,25 @@ type serviceGlanceResponse struct {
 	Trips struct {
 		Trip []struct {
 			Cars                string  `json:"Cars"`
+			StartTime           string  `json:"StartTime"`
+			EndTime             string  `json:"EndTime"`
 			TripNumber          string  `json:"TripNumber"`
 			LineCode            string  `json:"LineCode"`
+			RouteNumber         string  `json:"RouteNumber"`
+			VariantDir          string  `json:"VariantDir"`
 			Display             string  `json:"Display"`
 			DelaySeconds        int     `json:"DelaySeconds"`
 			OccupancyPercentage int     `json:"OccupancyPercentage"`
 			Latitude            float64 `json:"Latitude"`
 			Longitude           float64 `json:"Longitude"`
 			IsInMotion          bool    `json:"IsInMotion"`
+			Course              float64 `json:"Course"`
+			FirstStopCode       string  `json:"FirstStopCode"`
+			LastStopCode        string  `json:"LastStopCode"`
+			PrevStopCode        string  `json:"PrevStopCode"`
+			NextStopCode        string  `json:"NextStopCode"`
+			AtStationCode       string  `json:"AtStationCode"`
+			ModifiedDate        string  `json:"ModifiedDate"`
 		} `json:"Trip"`
 	} `json:"Trips"`
 }
@@ -143,7 +169,6 @@ type exceptionsResponse struct {
 	} `json:"Trip"`
 }
 
-
 // GetServiceGlance fetches all in-service train trips with occupancy and car count.
 func (c *Client) GetServiceGlance(ctx context.Context) ([]models.ServiceGlanceEntry, error) {
 	data, err := c.Fetch(ctx, "/ServiceataGlance/Trains/All")
@@ -158,14 +183,26 @@ func (c *Client) GetServiceGlance(ctx context.Context) ([]models.ServiceGlanceEn
 	entries := make([]models.ServiceGlanceEntry, 0, len(resp.Trips.Trip))
 	for _, t := range resp.Trips.Trip {
 		entries = append(entries, models.ServiceGlanceEntry{
-			TripNumber:   t.TripNumber,
-			LineCode:     t.LineCode,
-			LineName:     strings.TrimSpace(t.Display),
-			Cars:         t.Cars,
-			DelaySeconds: t.DelaySeconds,
-			Lat:          t.Latitude,
-			Lon:          t.Longitude,
-			IsInMotion:   t.IsInMotion,
+			TripNumber:          t.TripNumber,
+			LineCode:            t.LineCode,
+			LineName:            strings.TrimSpace(t.Display),
+			Cars:                t.Cars,
+			StartTime:           t.StartTime,
+			EndTime:             t.EndTime,
+			RouteNumber:         strings.TrimSpace(t.RouteNumber),
+			VariantDirection:    t.VariantDir,
+			DelaySeconds:        t.DelaySeconds,
+			OccupancyPercentage: t.OccupancyPercentage,
+			Lat:                 t.Latitude,
+			Lon:                 t.Longitude,
+			Course:              t.Course,
+			FirstStopCode:       t.FirstStopCode,
+			LastStopCode:        t.LastStopCode,
+			PrevStopCode:        t.PrevStopCode,
+			NextStopCode:        t.NextStopCode,
+			AtStationCode:       t.AtStationCode,
+			IsInMotion:          t.IsInMotion,
+			ModifiedDate:        t.ModifiedDate,
 		})
 	}
 	return entries, nil

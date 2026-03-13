@@ -1,9 +1,13 @@
 import { error, type Handle } from '@sveltejs/kit';
 import { closeSSE, isRateLimited, openSSE } from '$lib/server/rate-limit';
 
-const RATE_LIMIT = 60; // max requests per window
 const SSE_MAX_PER_IP = 3;
 const ALLOWED_FETCH_SITES = new Set(['same-origin', 'same-site', 'none']);
+
+type ApiRatePolicy = {
+	bucket: string;
+	maxRequests: number;
+};
 
 function getClientIp(event: Parameters<Handle>[0]['event']): string {
 	try {
@@ -38,6 +42,23 @@ function isAllowedBrowserApiRequest(event: Parameters<Handle>[0]['event']): bool
 	// Require at least one browser-supplied provenance signal so direct
 	// header-less requests from non-browser clients do not pass through.
 	return Boolean(origin || referer || fetchSite);
+}
+
+function getApiRatePolicy(pathname: string): ApiRatePolicy {
+	if (pathname.startsWith('/api/departures/')) {
+		return { bucket: 'departures', maxRequests: 45 };
+	}
+	if (pathname === '/api/alerts') {
+		return { bucket: 'alerts', maxRequests: 30 };
+	}
+	if (pathname === '/api/union-departures') {
+		return { bucket: 'union-departures', maxRequests: 20 };
+	}
+	if (pathname === '/api/network-health') {
+		return { bucket: 'network-health', maxRequests: 20 };
+	}
+
+	return { bucket: 'api', maxRequests: 30 };
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -75,7 +96,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	if (await isRateLimited(ip, RATE_LIMIT)) {
+	const policy = getApiRatePolicy(pathname);
+	if (await isRateLimited(ip, policy.maxRequests, policy.bucket)) {
 		throw error(429, 'Too many requests');
 	}
 

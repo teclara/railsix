@@ -14,6 +14,7 @@ import (
 
 	"github.com/teclara/railsix/gtfs-static/store"
 	"github.com/teclara/railsix/shared/config"
+	"github.com/teclara/railsix/shared/models"
 )
 
 func main() {
@@ -31,11 +32,13 @@ func main() {
 	registerRoutes(mux, static)
 
 	srv := &http.Server{
-		Addr:         ":" + port,
-		Handler:      mux,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	go func() {
@@ -56,19 +59,28 @@ func main() {
 }
 
 func registerRoutes(mux *http.ServeMux, s *store.StaticStore) {
-	mux.HandleFunc("GET /ready", handleReady(s))
-	mux.HandleFunc("GET /stops", handleStops(s))
-	mux.HandleFunc("GET /stops/{code}/ids", handleStopIDs(s))
-	mux.HandleFunc("GET /departures/{stopID}", handleDepartures(s))
-	mux.HandleFunc("GET /schedule/{code}", handleSchedule(s))
-	mux.HandleFunc("GET /trips/{tripID}", handleTrip(s))
-	mux.HandleFunc("GET /routes/{routeID}", handleRoute(s))
-	mux.HandleFunc("GET /trips/{tripID}/remaining-stops", handleRemainingStops(s))
-	mux.HandleFunc("GET /trips/{tripID}/is-last-stop", handleIsLastStop(s))
-	mux.HandleFunc("GET /trips/{tripID}/is-express", handleIsExpress(s))
-	mux.HandleFunc("GET /services/{serviceID}/active", handleServiceActive(s))
-	mux.HandleFunc("GET /trips/{tripID}/arrival", handleArrival(s))
-	mux.HandleFunc("GET /stop-name/{stopID}", handleStopName(s))
+	mux.HandleFunc("GET /ready", withGTFSVersion(s, handleReady(s)))
+	mux.HandleFunc("GET /stops", withGTFSVersion(s, handleStops(s)))
+	mux.HandleFunc("GET /stops/{code}/ids", withGTFSVersion(s, handleStopIDs(s)))
+	mux.HandleFunc("GET /departures/{stopID}", withGTFSVersion(s, handleDepartures(s)))
+	mux.HandleFunc("GET /schedule/{code}", withGTFSVersion(s, handleSchedule(s)))
+	mux.HandleFunc("GET /trips/{tripID}", withGTFSVersion(s, handleTrip(s)))
+	mux.HandleFunc("GET /routes/{routeID}", withGTFSVersion(s, handleRoute(s)))
+	mux.HandleFunc("GET /trips/{tripID}/remaining-stops", withGTFSVersion(s, handleRemainingStops(s)))
+	mux.HandleFunc("GET /trips/{tripID}/is-last-stop", withGTFSVersion(s, handleIsLastStop(s)))
+	mux.HandleFunc("GET /trips/{tripID}/is-express", withGTFSVersion(s, handleIsExpress(s)))
+	mux.HandleFunc("GET /services/{serviceID}/active", withGTFSVersion(s, handleServiceActive(s)))
+	mux.HandleFunc("GET /trips/{tripID}/arrival", withGTFSVersion(s, handleArrival(s)))
+	mux.HandleFunc("GET /stop-name/{stopID}", withGTFSVersion(s, handleStopName(s)))
+}
+
+func withGTFSVersion(s *store.StaticStore, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if version := s.Version(); version != "" {
+			w.Header().Set("X-GTFS-Version", version)
+		}
+		next(w, r)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -130,7 +142,7 @@ func handleDepartures(s *store.StaticStore) http.HandlerFunc {
 		stopID := r.PathValue("stopID")
 		deps := s.DeparturesForStop(stopID)
 		if deps == nil {
-			deps = []store.ScheduledDeparture{}
+			deps = []models.ScheduledDeparture{}
 		}
 		writeJSON(w, http.StatusOK, deps)
 	}
@@ -161,7 +173,7 @@ func handleSchedule(s *store.StaticStore) http.HandlerFunc {
 		}
 		candidates := s.ScheduleForStop(code, now, 3*time.Hour)
 		if candidates == nil {
-			candidates = []store.ScheduleCandidate{}
+			candidates = []models.ScheduleCandidate{}
 		}
 		writeJSON(w, http.StatusOK, candidates)
 	}
@@ -272,7 +284,7 @@ func handleArrival(s *store.StaticStore) http.HandlerFunc {
 		destIDs := r.URL.Query()["destID"]
 		originIDs := r.URL.Query()["originID"]
 		dur, ok := s.ArrivalTimeAtStop(tripID, destIDs, originIDs...)
-		writeJSON(w, http.StatusOK, store.ArrivalResult{
+		writeJSON(w, http.StatusOK, models.ArrivalResult{
 			Duration: int64(dur),
 			OK:       ok,
 		})

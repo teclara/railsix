@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/teclara/railsix/shared/cache"
 	"github.com/teclara/railsix/shared/config"
+	"github.com/teclara/railsix/shared/gtfsrt"
 	"github.com/teclara/railsix/shared/metrolinx"
 	"github.com/teclara/railsix/shared/models"
 )
@@ -44,7 +46,7 @@ type departureResponse struct {
 	Platform      string   `json:"platform,omitempty"`
 	DelayMinutes  int      `json:"delayMinutes,omitempty"`
 	Stops         []string `json:"stops,omitempty"`
-	LastStopID    string   `json:"lastStopId,omitempty"`
+	LastStopCode  string   `json:"lastStopCode,omitempty"`
 	Cars          string   `json:"cars,omitempty"`
 	IsInMotion    bool     `json:"isInMotion,omitempty"`
 	IsCancelled   bool     `json:"isCancelled,omitempty"`
@@ -86,6 +88,7 @@ func main() {
 	redisPassword := config.EnvOr(config.EnvRedisPassword, "")
 	gtfsStaticAddr := config.EnvOr(config.EnvGTFSStaticAddr, config.DefaultGTFSStaticAddr)
 	mxBase := config.EnvOr(config.EnvMetrolinxBase, config.DefaultMetrolinxBase)
+	maxConcurrentRequests := config.EnvOrInt("MAX_CONCURRENT_REQUESTS", 64)
 	mxKey := os.Getenv(config.EnvMetrolinxAPIKey)
 
 	rc, err := cache.Connect(redisAddr, redisPassword)
@@ -98,6 +101,8 @@ func main() {
 
 	redisClient := NewRedisClient(rc)
 	staticClient := NewStaticClient(gtfsStaticAddr)
+	requestLimiter := newConcurrencyLimiter(maxConcurrentRequests)
+	slog.Info("configured request concurrency limit", "max", maxConcurrentRequests)
 
 	var mx *metrolinx.Client
 	if mxKey != "" {
@@ -108,17 +113,19 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	registerRoutes(mux, staticClient, redisClient, mx)
+	registerRoutes(mux, staticClient, redisClient, mx, requestLimiter)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	srv := &http.Server{
-		Addr:         ":" + port,
-		Handler:      mux,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	go func() {
@@ -138,13 +145,20 @@ func main() {
 	}
 }
 
-func registerRoutes(mux *http.ServeMux, sc *StaticClient, rc *RedisClient, mx *metrolinx.Client) {
-	mux.HandleFunc("GET /health", handleHealth(sc, rc))
-	mux.HandleFunc("GET /stops", handleStops(sc))
-	mux.HandleFunc("GET /departures/{stopCode}", handleDepartures(sc, rc, mx))
-	mux.HandleFunc("GET /union-departures", handleUnionDepartures(rc))
-	mux.HandleFunc("GET /network-health", handleNetworkHealth(rc))
-	mux.HandleFunc("GET /alerts", handleAlerts(rc))
+func registerRoutes(
+	mux *http.ServeMux,
+	sc *StaticClient,
+	rc *RedisClient,
+	mx *metrolinx.Client,
+	limiter *concurrencyLimiter,
+) {
+	mux.HandleFunc("GET /health", handleLiveness())
+	mux.HandleFunc("GET /ready", handleReady(sc, rc))
+	mux.HandleFunc("GET /stops", limiter.wrap(handleStops(sc)))
+	mux.HandleFunc("GET /departures/{stopCode}", limiter.wrap(handleDepartures(sc, rc, mx)))
+	mux.HandleFunc("GET /union-departures", limiter.wrap(handleUnionDepartures(rc)))
+	mux.HandleFunc("GET /network-health", limiter.wrap(handleNetworkHealth(rc)))
+	mux.HandleFunc("GET /alerts", limiter.wrap(handleAlerts(rc)))
 }
 
 func handleStops(sc *StaticClient) http.HandlerFunc {
@@ -152,7 +166,7 @@ func handleStops(sc *StaticClient) http.HandlerFunc {
 		data, err := sc.GetStops()
 		if err != nil {
 			slog.Warn("stops proxy failed", "error", err)
-			jsonError(w, "unable to fetch stops", http.StatusBadGateway)
+			jsonError(w, "unable to fetch stops", statusForStaticClientError(err))
 			return
 		}
 		slog.Info("stops proxy ok", "bytes", len(data))
@@ -177,7 +191,12 @@ func handleDepartures(sc *StaticClient, rc *RedisClient, mx *metrolinx.Client) h
 			destCode = ""
 		}
 
-		departures := GetDepartures(r.Context(), stopCode, destCode, time.Now(), sc, rc)
+		departures, err := GetDepartures(r.Context(), stopCode, destCode, time.Now(), sc, rc)
+		if err != nil {
+			slog.Warn("failed to build departures", "stopCode", stopCode, "destCode", destCode, "error", err)
+			jsonError(w, "departures are temporarily unavailable", statusForDependencyError(err))
+			return
+		}
 
 		// Enrich with NextService real-time data (cached with 30s TTL).
 		if mx != nil && len(departures) > 0 {
@@ -212,29 +231,41 @@ func handleDepartures(sc *StaticClient, rc *RedisClient, mx *metrolinx.Client) h
 		}
 
 		// Enrich with cached Union departures for platform data.
-		if unionDeps := rc.GetUnionDepartures(r.Context()); len(unionDeps) > 0 {
-			type udKey struct{ service, time string }
-			udMap := make(map[udKey]string, len(unionDeps))
-			for _, ud := range unionDeps {
-				p := strings.TrimSpace(ud.Platform)
-				if p != "" && p != "-" {
-					udMap[udKey{strings.ToUpper(ud.Service), ud.Time}] = p
+		if err := rc.RequireFresh(r.Context(), keyUnionDeparturesUpdatedAt, "union departures", realtimeFreshnessThreshold); err == nil {
+			unionDeps, readErr := rc.GetUnionDepartures(r.Context())
+			if readErr == nil && len(unionDeps) > 0 {
+				type udKey struct{ service, time string }
+				udMap := make(map[udKey]string, len(unionDeps))
+				for _, ud := range unionDeps {
+					p := strings.TrimSpace(ud.Platform)
+					if p != "" && p != "-" {
+						udMap[udKey{strings.ToUpper(ud.Service), ud.Time}] = p
+					}
 				}
-			}
-			for i := range departures {
-				if departures[i].Platform != "" {
-					continue
-				}
-				key := udKey{strings.ToUpper(departures[i].LineName), departures[i].ScheduledTime}
-				if p, ok := udMap[key]; ok {
-					departures[i].Platform = p
+				for i := range departures {
+					if departures[i].Platform != "" {
+						continue
+					}
+					key := udKey{strings.ToUpper(departures[i].LineName), departures[i].ScheduledTime}
+					if p, ok := udMap[key]; ok {
+						departures[i].Platform = p
+					}
 				}
 			}
 		}
 
 		// Return slim response with station alert envelope.
-		alertTexts := routeAlertTexts(rc, r.Context())
-		stopAlerts := stopAlertTexts(rc, r.Context())
+		var alerts []models.Alert
+		if err := rc.RequireFresh(r.Context(), keyAlertsUpdatedAt, "alerts", realtimeFreshnessThreshold); err == nil {
+			cachedAlerts, readErr := rc.GetAlerts(r.Context())
+			if readErr != nil {
+				slog.Warn("failed to read alerts for departures response", "error", readErr)
+			} else {
+				alerts = cachedAlerts
+			}
+		}
+		alertTexts := routeAlertTexts(alerts)
+		stopAlerts := stopAlertTexts(alerts)
 
 		// Check if the queried station has a stop-specific alert.
 		var stationAlert string
@@ -262,7 +293,7 @@ func handleDepartures(sc *StaticClient, rc *RedisClient, mx *metrolinx.Client) h
 				Platform:      d.Platform,
 				DelayMinutes:  d.DelayMinutes,
 				Stops:         d.Stops,
-				LastStopID:    d.LastStopID,
+				LastStopCode:  d.LastStopCode,
 				Cars:          d.Cars,
 				IsInMotion:    d.IsInMotion,
 				IsCancelled:   d.IsCancelled,
@@ -280,12 +311,40 @@ func handleDepartures(sc *StaticClient, rc *RedisClient, mx *metrolinx.Client) h
 
 func handleUnionDepartures(rc *RedisClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		deps := rc.GetUnionDepartures(r.Context())
-		if deps == nil {
-			respondJSON(w, []unionDepartureResponse{})
+		if err := rc.RequireFresh(r.Context(), keyUnionDeparturesUpdatedAt, "union departures", realtimeFreshnessThreshold); err != nil {
+			jsonError(w, "union departures are temporarily unavailable", http.StatusServiceUnavailable)
 			return
 		}
-		alertTexts := routeAlertTexts(rc, r.Context())
+		deps, err := rc.GetUnionDepartures(r.Context())
+		if err != nil {
+			slog.Warn("failed to read union departures", "error", err)
+			jsonError(w, "union departures are temporarily unavailable", http.StatusBadGateway)
+			return
+		}
+		alertTexts := map[string]string{}
+		if err := rc.RequireFresh(r.Context(), keyAlertsUpdatedAt, "alerts", realtimeFreshnessThreshold); err == nil {
+			if alerts, readErr := rc.GetAlerts(r.Context()); readErr == nil {
+				alertTexts = routeAlertTexts(alerts)
+			}
+		}
+		glanceAll := map[string]models.ServiceGlanceEntry{}
+		if err := rc.RequireFresh(r.Context(), keyServiceGlanceUpdatedAt, "service glance", realtimeFreshnessThreshold); err == nil {
+			if entries, readErr := rc.GetAllServiceGlanceMap(r.Context()); readErr == nil {
+				glanceAll = entries
+			}
+		}
+		tripUpdates := map[string]gtfsrt.RawTripUpdate{}
+		if err := rc.RequireFresh(r.Context(), keyTripUpdatesUpdatedAt, "trip updates", realtimeFreshnessThreshold); err == nil {
+			if updates, readErr := rc.GetAllTripUpdates(r.Context()); readErr == nil {
+				tripUpdates = updates
+			}
+		}
+		exceptions := map[string][]string{}
+		if err := rc.RequireFresh(r.Context(), keyExceptionsUpdatedAt, "exceptions", realtimeFreshnessThreshold); err == nil {
+			if cachedExceptions, readErr := rc.GetAllExceptions(r.Context()); readErr == nil {
+				exceptions = cachedExceptions
+			}
+		}
 		slim := make([]unionDepartureResponse, len(deps))
 		for i, d := range deps {
 			slim[i] = unionDepartureResponse{
@@ -298,14 +357,14 @@ func handleUnionDepartures(rc *RedisClient) http.HandlerFunc {
 				IsCancelled: strings.Contains(strings.ToUpper(d.Info), "CANCEL"),
 				Alert:       alertTexts[lineCodeForService[strings.ToUpper(d.Service)]],
 			}
-			if sg, ok := rc.GetServiceGlanceEntry(r.Context(), d.TripNumber); ok {
+			if sg, ok := glanceAll[d.TripNumber]; ok {
 				slim[i].Cars = sg.Cars
 				slim[i].IsInMotion = sg.IsInMotion
 			}
-			if rc.IsTripCancelled(r.Context(), d.TripNumber) {
+			if cancelledStops, ok := exceptions[d.TripNumber]; ok && len(cancelledStops) == 0 {
 				slim[i].IsCancelled = true
 			}
-			if update, ok := rc.GetTripUpdate(r.Context(), d.TripNumber); ok {
+			if update, ok := tripUpdates[d.TripNumber]; ok {
 				if update.ScheduleRelationship == "CANCELED" {
 					slim[i].IsCancelled = true
 				}
@@ -317,7 +376,16 @@ func handleUnionDepartures(rc *RedisClient) http.HandlerFunc {
 
 func handleNetworkHealth(rc *RedisClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		entries := rc.GetAllServiceGlance(r.Context())
+		if err := rc.RequireFresh(r.Context(), keyServiceGlanceUpdatedAt, "service glance", realtimeFreshnessThreshold); err != nil {
+			jsonError(w, "network health is temporarily unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		entries, err := rc.GetAllServiceGlance(r.Context())
+		if err != nil {
+			slog.Warn("failed to read network health data", "error", err)
+			jsonError(w, "network health is temporarily unavailable", http.StatusBadGateway)
+			return
+		}
 		counts := make(map[string]int, len(allLines))
 		for _, e := range entries {
 			if e.LineCode != "" {
@@ -339,9 +407,14 @@ func handleNetworkHealth(rc *RedisClient) http.HandlerFunc {
 
 func handleAlerts(rc *RedisClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		alerts := rc.GetAlerts(r.Context())
-		if alerts == nil {
-			respondJSON(w, []alertResponse{})
+		if err := rc.RequireFresh(r.Context(), keyAlertsUpdatedAt, "alerts", realtimeFreshnessThreshold); err != nil {
+			jsonError(w, "alerts are temporarily unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		alerts, err := rc.GetAlerts(r.Context())
+		if err != nil {
+			slog.Warn("failed to read alerts", "error", err)
+			jsonError(w, "alerts are temporarily unavailable", http.StatusBadGateway)
 			return
 		}
 		slim := make([]alertResponse, len(alerts))
@@ -358,8 +431,7 @@ func handleAlerts(rc *RedisClient) http.HandlerFunc {
 }
 
 // stopAlertTexts returns a map of stop ID -> alert headline for stop-specific alerts.
-func stopAlertTexts(rc *RedisClient, ctx context.Context) map[string]string {
-	alerts := rc.GetAlerts(ctx)
+func stopAlertTexts(alerts []models.Alert) map[string]string {
 	m := make(map[string]string)
 	for _, a := range alerts {
 		for _, sid := range a.StopIDs {
@@ -375,8 +447,7 @@ func stopAlertTexts(rc *RedisClient, ctx context.Context) map[string]string {
 // Line codes are extracted from the route_id suffix (e.g. "01260426-ST" → "ST").
 // This avoids collisions between bus and train routes that share a display name
 // (e.g. bus route 71 "Stouffville" vs train route ST "Stouffville").
-func routeAlertTexts(rc *RedisClient, ctx context.Context) map[string]string {
-	alerts := rc.GetAlerts(ctx)
+func routeAlertTexts(alerts []models.Alert) map[string]string {
 	m := make(map[string]string)
 	for _, a := range alerts {
 		for _, rid := range a.RouteIDs {
@@ -431,4 +502,20 @@ func jsonError(w http.ResponseWriter, msg string, status int) {
 	if _, err := w.Write(data); err != nil {
 		slog.Warn("write error response failed", "error", err)
 	}
+}
+
+func statusForStaticClientError(err error) int {
+	var upstreamErr *upstreamError
+	if errors.As(err, &upstreamErr) && upstreamErr.StatusCode == http.StatusServiceUnavailable {
+		return http.StatusServiceUnavailable
+	}
+	return http.StatusBadGateway
+}
+
+func statusForDependencyError(err error) int {
+	var upstreamErr *upstreamError
+	if errors.As(err, &upstreamErr) {
+		return statusForStaticClientError(upstreamErr)
+	}
+	return http.StatusServiceUnavailable
 }

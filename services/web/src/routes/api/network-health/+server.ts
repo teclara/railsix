@@ -1,4 +1,4 @@
 import { proxyFetch } from '$lib/server/proxy';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = () => proxyFetch('/network-health');
+export const GET: RequestHandler = ({ request }) => proxyFetch('/network-health', request.signal);

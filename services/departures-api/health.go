@@ -10,11 +10,11 @@ import (
 const realtimeFreshnessThreshold = 3 * time.Minute
 
 var realtimeHealthKeys = map[string]string{
-	"alerts":          "transit:alerts:updated-at",
-	"tripUpdates":     "transit:trip-updates:updated-at",
-	"serviceGlance":   "transit:service-glance:updated-at",
-	"exceptions":      "transit:exceptions:updated-at",
-	"unionDepartures": "transit:union-departures:updated-at",
+	"alerts":          keyAlertsUpdatedAt,
+	"tripUpdates":     keyTripUpdatesUpdatedAt,
+	"serviceGlance":   keyServiceGlanceUpdatedAt,
+	"exceptions":      keyExceptionsUpdatedAt,
+	"unionDepartures": keyUnionDeparturesUpdatedAt,
 }
 
 type healthCheck struct {
@@ -38,7 +38,15 @@ type redisHealthChecker interface {
 	GetAge(context.Context, string) (time.Duration, error)
 }
 
-func handleHealth(sc staticHealthChecker, rc redisHealthChecker) http.HandlerFunc {
+func handleLiveness() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		respondJSONStatus(w, http.StatusOK, map[string]string{
+			"status": "ok",
+		})
+	}
+}
+
+func handleReady(sc staticHealthChecker, rc redisHealthChecker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 		defer cancel()

@@ -490,7 +490,7 @@
 							{/each}
 							{#if dep.stops && dep.stops.length > 0}
 								<span
-									class="direction-tag {dep.lastStopId === 'UN'
+									class="direction-tag {dep.lastStopCode === 'UN'
 										? 'text-green-400'
 										: 'text-purple-400'}">TO {dep.stops[dep.stops.length - 1].toUpperCase()}</span
 								>
@@ -521,7 +521,9 @@
 
 				{#if isMobile && dep.stops && dep.stops.length > 0}
 					<div
-						class="direction-line {dep.lastStopId === 'UN' ? 'text-green-400' : 'text-purple-400'}"
+						class="direction-line {dep.lastStopCode === 'UN'
+							? 'text-green-400'
+							: 'text-purple-400'}"
 					>
 						TO {dep.stops[dep.stops.length - 1].toUpperCase()}
 					</div>

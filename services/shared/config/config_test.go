@@ -49,3 +49,25 @@ func TestRequire_Failure(t *testing.T) {
 		t.Fatalf("Require(%q) expected error, got nil", key)
 	}
 }
+
+func TestEnvOrInt_WithValidEnvVar(t *testing.T) {
+	const key = "TEST_ENVORINT_VALID"
+	os.Setenv(key, "42")
+	defer os.Unsetenv(key)
+
+	got := EnvOrInt(key, 5)
+	if got != 42 {
+		t.Errorf("EnvOrInt(%q, %d) = %d, want %d", key, 5, got, 42)
+	}
+}
+
+func TestEnvOrInt_WithInvalidEnvVarFallsBack(t *testing.T) {
+	const key = "TEST_ENVORINT_INVALID"
+	os.Setenv(key, "invalid")
+	defer os.Unsetenv(key)
+
+	got := EnvOrInt(key, 5)
+	if got != 5 {
+		t.Errorf("EnvOrInt(%q, %d) = %d, want %d", key, 5, got, 5)
+	}
+}

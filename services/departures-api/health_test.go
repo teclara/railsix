@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -91,5 +94,50 @@ func TestEvaluateDeparturesHealthDependencyFailure(t *testing.T) {
 	}
 	if got := result.Checks["gtfsStatic"].Status; got != "error" {
 		t.Fatalf("gtfsStatic status = %q, want error", got)
+	}
+}
+
+func TestHandleLivenessReturnsMinimalOK(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+
+	handleLiveness().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d, want 200", rec.Code)
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if len(body) != 1 || body["status"] != "ok" {
+		t.Fatalf("unexpected body: %#v", body)
+	}
+}
+
+func TestHandleReadyReturnsDependencyChecks(t *testing.T) {
+	ages := make(map[string]time.Duration, len(realtimeHealthKeys))
+	for _, key := range realtimeHealthKeys {
+		ages[key] = 30 * time.Second
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	rec := httptest.NewRecorder()
+
+	handleReady(fakeStaticHealth{}, fakeRedisHealth{
+		ages: ages,
+	}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d, want 200", rec.Code)
+	}
+
+	var body healthResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if body.Checks["redis"].Status != "ok" {
+		t.Fatalf("redis status = %q, want ok", body.Checks["redis"].Status)
 	}
 }

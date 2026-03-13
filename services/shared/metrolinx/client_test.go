@@ -1,6 +1,11 @@
 package metrolinx
 
 import (
+	"bytes"
+	"context"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -33,4 +38,33 @@ func TestParseMetrolinxTime_Empty(t *testing.T) {
 	if got != want {
 		t.Errorf("parseMetrolinxTime(%q) = %q, want %q", "", got, want)
 	}
+}
+
+func TestFetchRejectsOversizedResponses(t *testing.T) {
+	oversizedBody := bytes.Repeat([]byte("a"), 10*1024*1024+1)
+	client := NewClient("https://metrolinx.test", "test-key")
+	client.httpClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(oversizedBody)),
+			}, nil
+		}),
+	}
+	data, err := client.Fetch(context.Background(), "/Gtfs/Feed/Alerts")
+	if err == nil {
+		t.Fatal("expected oversized response to fail")
+	}
+	if data != nil {
+		t.Fatalf("expected no data on oversized response, got %d bytes", len(data))
+	}
+	if !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("expected oversize error, got %v", err)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
 }

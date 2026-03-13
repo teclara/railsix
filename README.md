@@ -17,18 +17,19 @@ Real-time GO Transit tracking for Toronto commuters. Split-flap departure board,
 
 ## Architecture
 
-Monorepo with 6 microservices + shared module, connected via NATS and Redis:
+Monorepo with 5 services + shared modules, connected via NATS and Redis:
 
 ```
-Browser → SvelteKit (SSR) → API Gateway → departures-api/gtfs-static → Redis/Metrolinx
+Browser → SvelteKit (SSR proxy) → departures-api/gtfs-static → Redis/Metrolinx
+                                   ↘ sse-push → NATS
 ```
 
 All services live under `services/`:
+
 - **`shared/`** — Go module: models, NATS/Redis helpers, Metrolinx client
 - **`gtfs-static/`** — GTFS ZIP loader, schedule queries via HTTP
 - **`realtime-poller/`** — Unified poller for Metrolinx feeds → Redis + NATS
-- **`departures-api/`** — Departure queries, fares, alerts, network health
-- **`api-gateway/`** — Thin routing layer, CORS, health aggregation
+- **`departures-api/`** — Departure queries, alerts, network health
 - **`sse-push/`** — NATS → SSE streams to browsers
 - **`web/`** — SvelteKit frontend
 
@@ -52,7 +53,6 @@ docker compose up
 cd services/gtfs-static && go run .       # port 8081
 cd services/realtime-poller && go run .   # polls + publishes
 cd services/departures-api && go run .    # port 8082
-cd services/api-gateway && go run .       # port 8080
 cd services/sse-push && go run .          # port 8085
 ```
 
@@ -61,7 +61,7 @@ cd services/sse-push && go run .          # port 8085
 ```bash
 cd services/web
 npm install
-echo "API_BASE_URL=http://localhost:8080" > .env
+echo "API_BASE_URL=http://localhost:8082" > .env
 npm run dev
 ```
 
@@ -69,16 +69,15 @@ Starts on port 5173.
 
 ## API Endpoints
 
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/health` | Aggregated health check |
-| GET | `/api/stops` | All GO Transit stops |
-| GET | `/api/departures/{stopCode}` | Departures for a station (`?dest=` optional) |
-| GET | `/api/union-departures` | Union Station departure board |
-| GET | `/api/alerts` | Active service alerts |
-| GET | `/api/network-health` | Active trains per GO line |
-| GET | `/api/fares/{from}/{to}` | Fare info between two stations |
-| GET | `/api/sse` | SSE stream for real-time updates |
+| Method | Path                         | Description                                  |
+| ------ | ---------------------------- | -------------------------------------------- |
+| GET    | `/api/health`                | `departures-api` health check                |
+| GET    | `/api/stops`                 | All GO Transit stops                         |
+| GET    | `/api/departures/{stopCode}` | Departures for a station (`?dest=` optional) |
+| GET    | `/api/union-departures`      | Union Station departure board                |
+| GET    | `/api/alerts`                | Active service alerts                        |
+| GET    | `/api/network-health`        | Active trains per GO line                    |
+| GET    | `/api/sse`                   | SSE stream for real-time updates             |
 
 ## Tech Stack
 
@@ -91,7 +90,9 @@ Starts on port 5173.
 
 ```bash
 # Services
-cd services && go test ./... -v -short && go vet ./...
+cd services
+go test ./departures-api/... ./gtfs-static/... ./realtime-poller/... ./shared/... ./sse-push/... -v -short
+go vet ./departures-api/... ./gtfs-static/... ./realtime-poller/... ./shared/... ./sse-push/...
 
 # Web
 cd services/web && npm run check && npm run lint && npm run build

@@ -1,4 +1,4 @@
-import type { Alert } from './api';
+import type { Alert, DeparturesResult, NetworkLine, UnionDeparture } from './api-contract';
 
 export class ApiError extends Error {
 	constructor(
@@ -18,30 +18,6 @@ export async function fetchAlerts(signal?: AbortSignal): Promise<Alert[]> {
 	return res.json();
 }
 
-export type Departure = {
-	line: string;
-	lineName?: string;
-	scheduledTime: string;
-	actualTime?: string;
-	arrivalTime?: string;
-	status: string;
-	platform?: string;
-	delayMinutes?: number;
-	stops?: string[];
-	lastStopId?: string;
-	cars?: string;
-	isInMotion?: boolean;
-	isCancelled?: boolean;
-	isExpress?: boolean;
-	alert?: string;
-	routeType?: number;
-};
-
-export type DeparturesResult = {
-	stationAlert?: string;
-	departures: Departure[];
-};
-
 export async function fetchDepartures(
 	stopCode: string,
 	destCode?: string,
@@ -57,19 +33,6 @@ export async function fetchDepartures(
 	return res.json();
 }
 
-export type UnionDeparture = {
-	service: string;
-	serviceType?: string;
-	platform: string;
-	time: string;
-	info: string;
-	stops: string[];
-	cars?: string;
-	isInMotion?: boolean;
-	isCancelled?: boolean;
-	alert?: string;
-};
-
 export async function fetchUnionDepartures(): Promise<UnionDeparture[]> {
 	const res = await fetch('/api/union-departures', {
 		signal: AbortSignal.timeout(10000)
@@ -78,12 +41,6 @@ export async function fetchUnionDepartures(): Promise<UnionDeparture[]> {
 	return res.json();
 }
 
-export type NetworkLine = {
-	lineCode: string;
-	lineName: string;
-	activeTrips: number;
-};
-
 export async function fetchNetworkHealth(): Promise<NetworkLine[]> {
 	const res = await fetch('/api/network-health', {
 		signal: AbortSignal.timeout(10000)
@@ -91,3 +48,11 @@ export async function fetchNetworkHealth(): Promise<NetworkLine[]> {
 	if (!res.ok) throw new ApiError(res.status, `network-health: ${res.status}`);
 	return res.json();
 }
+
+export type {
+	Alert,
+	Departure,
+	DeparturesResult,
+	NetworkLine,
+	UnionDeparture
+} from './api-contract';

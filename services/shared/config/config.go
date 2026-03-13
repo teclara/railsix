@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // Environment variable name constants.
@@ -13,9 +14,9 @@ const (
 	EnvMetrolinxAPIKey = "METROLINX_API_KEY"
 	EnvMetrolinxBase   = "METROLINX_BASE_URL"
 	EnvPort            = "PORT"
-	EnvAllowedOrigins = "ALLOWED_ORIGINS"
-	EnvGTFSStaticURL  = "GTFS_STATIC_URL"
-	EnvGTFSStaticAddr = "GTFS_STATIC_ADDR"
+	EnvAllowedOrigins  = "ALLOWED_ORIGINS"
+	EnvGTFSStaticURL   = "GTFS_STATIC_URL"
+	EnvGTFSStaticAddr  = "GTFS_STATIC_ADDR"
 )
 
 // Default values for environment variables.
@@ -34,6 +35,22 @@ func EnvOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// EnvOrInt returns the parsed integer value of the environment variable named
+// by key, or fallback if the variable is not set, invalid, or non-positive.
+func EnvOrInt(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+
+	parsed, err := strconv.Atoi(v)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+
+	return parsed
 }
 
 // Require returns the value of the environment variable named by key,

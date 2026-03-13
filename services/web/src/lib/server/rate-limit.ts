@@ -78,12 +78,17 @@ function currentRateBucket(now = Date.now()) {
 	return { bucket, resetAt };
 }
 
-function memoryRateLimit(ip: string, maxRequests: number): boolean {
+function rateKey(bucket: string, ip: string): string {
+	return `${bucket}:${ip}`;
+}
+
+function memoryRateLimit(bucket: string, ip: string, maxRequests: number): boolean {
 	const now = Date.now();
-	const entry = hits.get(ip);
+	const key = rateKey(bucket, ip);
+	const entry = hits.get(key);
 
 	if (!entry || now > entry.resetAt) {
-		hits.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+		hits.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS });
 		return false;
 	}
 
@@ -104,14 +109,18 @@ function memoryCloseSSE(ip: string) {
 	else sseConns.set(ip, count);
 }
 
-export async function isRateLimited(ip: string, maxRequests: number): Promise<boolean> {
+export async function isRateLimited(
+	ip: string,
+	maxRequests: number,
+	bucketName = 'default'
+): Promise<boolean> {
 	const client = await getRedisClient();
 	if (!client) {
-		return memoryRateLimit(ip, maxRequests);
+		return memoryRateLimit(bucketName, ip, maxRequests);
 	}
 
 	const { bucket, resetAt } = currentRateBucket();
-	const key = `${API_RATE_PREFIX}:${bucket}:${ip}`;
+	const key = `${API_RATE_PREFIX}:${bucket}:${rateKey(bucketName, ip)}`;
 
 	try {
 		const count = await client.incr(key);
@@ -121,7 +130,7 @@ export async function isRateLimited(ip: string, maxRequests: number): Promise<bo
 		return count > maxRequests;
 	} catch (error) {
 		logRedisWarning(error);
-		return memoryRateLimit(ip, maxRequests);
+		return memoryRateLimit(bucketName, ip, maxRequests);
 	}
 }
 

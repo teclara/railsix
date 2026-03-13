@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -13,11 +15,16 @@ import (
 
 // Redis key constants matching the realtime-poller's storage layout.
 const (
-	keyAlerts          = "transit:alerts"
-	keyTripUpdates     = "transit:trip-updates"
-	keyServiceGlance   = "transit:service-glance"
-	keyExceptions      = "transit:exceptions"
-	keyUnionDepartures = "transit:union-departures"
+	keyAlerts                   = "transit:alerts"
+	keyAlertsUpdatedAt          = "transit:alerts:updated-at"
+	keyTripUpdates              = "transit:trip-updates"
+	keyTripUpdatesUpdatedAt     = "transit:trip-updates:updated-at"
+	keyServiceGlance            = "transit:service-glance"
+	keyServiceGlanceUpdatedAt   = "transit:service-glance:updated-at"
+	keyExceptions               = "transit:exceptions"
+	keyExceptionsUpdatedAt      = "transit:exceptions:updated-at"
+	keyUnionDepartures          = "transit:union-departures"
+	keyUnionDeparturesUpdatedAt = "transit:union-departures:updated-at"
 )
 
 // RedisClient wraps Redis reads needed by departure logic.
@@ -40,104 +47,77 @@ func (r *RedisClient) GetAge(ctx context.Context, key string) (time.Duration, er
 	return cache.GetAge(ctx, r.rc, key)
 }
 
-// GetTripUpdate retrieves a trip update from the Redis hash by trip ID.
-func (r *RedisClient) GetTripUpdate(ctx context.Context, tripID string) (gtfsrt.RawTripUpdate, bool) {
-	var update gtfsrt.RawTripUpdate
-	err := cache.GetHashFieldJSON(ctx, r.rc, keyTripUpdates, tripID, &update)
+// RequireFresh ensures a dataset has a recent timestamp before serving data from it.
+func (r *RedisClient) RequireFresh(ctx context.Context, updatedAtKey, name string, maxAge time.Duration) error {
+	age, err := r.GetAge(ctx, updatedAtKey)
 	if err != nil {
-		return gtfsrt.RawTripUpdate{}, false
-	}
-	return update, true
-}
-
-// GetServiceGlanceEntry retrieves a service glance entry by trip number.
-func (r *RedisClient) GetServiceGlanceEntry(ctx context.Context, tripNum string) (models.ServiceGlanceEntry, bool) {
-	var entry models.ServiceGlanceEntry
-	err := cache.GetHashFieldJSON(ctx, r.rc, keyServiceGlance, tripNum, &entry)
-	if err != nil {
-		return models.ServiceGlanceEntry{}, false
-	}
-	return entry, true
-}
-
-// getExceptionStops retrieves the cancelled stop codes for a trip number.
-// Returns nil, false if the trip has no exceptions entry.
-// Returns empty slice, true if the whole trip is cancelled.
-// Returns stop codes, true if specific stops are cancelled.
-func (r *RedisClient) getExceptionStops(ctx context.Context, tripNum string) ([]string, bool) {
-	var stops []string
-	err := cache.GetHashFieldJSON(ctx, r.rc, keyExceptions, tripNum, &stops)
-	if err != nil {
-		return nil, false
-	}
-	return stops, true
-}
-
-// IsTripCancelled checks if a whole trip is cancelled (exists with empty stop array).
-func (r *RedisClient) IsTripCancelled(ctx context.Context, tripNum string) bool {
-	stops, ok := r.getExceptionStops(ctx, tripNum)
-	if !ok {
-		return false
-	}
-	return len(stops) == 0
-}
-
-// IsStopCancelled checks if a specific stop is cancelled for a trip.
-// Returns true if the whole trip is cancelled OR the specific stop is in the list.
-func (r *RedisClient) IsStopCancelled(ctx context.Context, tripNum, stopID string) bool {
-	stops, ok := r.getExceptionStops(ctx, tripNum)
-	if !ok {
-		return false
-	}
-	if len(stops) == 0 {
-		return true // whole trip cancelled
-	}
-	for _, s := range stops {
-		if s == stopID {
-			return true
+		if errors.Is(err, redis.Nil) {
+			return fmt.Errorf("%s cache is not ready", name)
 		}
+		return fmt.Errorf("%s freshness check failed: %w", name, err)
 	}
-	return false
+	if age > maxAge {
+		return fmt.Errorf("%s cache is stale (%s old)", name, age.Round(time.Second))
+	}
+	return nil
+}
+
+// GetAllTripUpdates returns cached trip updates indexed by both full trip ID and trip number.
+func (r *RedisClient) GetAllTripUpdates(ctx context.Context) (map[string]gtfsrt.RawTripUpdate, error) {
+	updates, err := cache.GetHashAllJSON[gtfsrt.RawTripUpdate](ctx, r.rc, keyTripUpdates)
+	if err != nil {
+		return nil, fmt.Errorf("read trip updates: %w", err)
+	}
+	return updates, nil
+}
+
+// GetAllExceptions returns cancelled stop IDs indexed by trip number.
+func (r *RedisClient) GetAllExceptions(ctx context.Context) (map[string][]string, error) {
+	exceptions, err := cache.GetHashAllJSON[[]string](ctx, r.rc, keyExceptions)
+	if err != nil {
+		return nil, fmt.Errorf("read exceptions: %w", err)
+	}
+	return exceptions, nil
 }
 
 // GetUnionDepartures returns all cached Union Station departures.
-func (r *RedisClient) GetUnionDepartures(ctx context.Context) []models.UnionDeparture {
+func (r *RedisClient) GetUnionDepartures(ctx context.Context) ([]models.UnionDeparture, error) {
 	var deps []models.UnionDeparture
 	if err := cache.GetJSON(ctx, r.rc, keyUnionDepartures, &deps); err != nil {
-		return nil
+		return nil, fmt.Errorf("read union departures: %w", err)
 	}
-	return deps
+	return deps, nil
 }
 
 // GetAlerts returns all cached alerts.
-func (r *RedisClient) GetAlerts(ctx context.Context) []models.Alert {
+func (r *RedisClient) GetAlerts(ctx context.Context) ([]models.Alert, error) {
 	var alerts []models.Alert
 	if err := cache.GetJSON(ctx, r.rc, keyAlerts, &alerts); err != nil {
-		return nil
+		return nil, fmt.Errorf("read alerts: %w", err)
 	}
-	return alerts
+	return alerts, nil
 }
 
 // GetAllServiceGlanceMap returns all service glance entries indexed by trip number.
-func (r *RedisClient) GetAllServiceGlanceMap(ctx context.Context) map[string]models.ServiceGlanceEntry {
+func (r *RedisClient) GetAllServiceGlanceMap(ctx context.Context) (map[string]models.ServiceGlanceEntry, error) {
 	all, err := cache.GetHashAllJSON[models.ServiceGlanceEntry](ctx, r.rc, keyServiceGlance)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("read service glance: %w", err)
 	}
-	return all
+	return all, nil
 }
 
 // GetAllServiceGlance returns all service glance entries.
-func (r *RedisClient) GetAllServiceGlance(ctx context.Context) []models.ServiceGlanceEntry {
-	all, err := cache.GetHashAllJSON[models.ServiceGlanceEntry](ctx, r.rc, keyServiceGlance)
+func (r *RedisClient) GetAllServiceGlance(ctx context.Context) ([]models.ServiceGlanceEntry, error) {
+	all, err := r.GetAllServiceGlanceMap(ctx)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	entries := make([]models.ServiceGlanceEntry, 0, len(all))
 	for _, e := range all {
 		entries = append(entries, e)
 	}
-	return entries
+	return entries, nil
 }
 
 // GetNextService retrieves cached NextService data for a stop code.
@@ -155,4 +135,3 @@ func (r *RedisClient) SetNextService(ctx context.Context, stopCode string, lines
 	key := "transit:next-service:" + stopCode
 	_ = cache.SetJSON(ctx, r.rc, key, lines, 30*time.Second)
 }
-

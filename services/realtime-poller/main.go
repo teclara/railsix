@@ -57,10 +57,13 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler(nc, healthRedis, lookup))
 	healthSrv := &http.Server{
-		Addr:         ":" + healthPort,
-		Handler:      mux,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
+		Addr:              ":" + healthPort,
+		Handler:           mux,
+		ReadTimeout:       5 * time.Second,
+		ReadHeaderTimeout: 3 * time.Second,
+		WriteTimeout:      5 * time.Second,
+		IdleTimeout:       30 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 	go func() {
 		slog.Info("health endpoint listening", "port", healthPort)

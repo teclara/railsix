@@ -14,34 +14,18 @@ import (
 	"github.com/teclara/railsix/shared/models"
 )
 
-// ScheduledDeparture mirrors gtfs-static's store.ScheduledDeparture.
-type ScheduledDeparture struct {
-	TripID        string `json:"tripId"`
-	RouteID       string `json:"routeId"`
-	ServiceID     string `json:"serviceId"`
-	Headsign      string `json:"headsign"`
-	DepartureTime int64  `json:"departureTime"` // nanoseconds from midnight
+type ScheduledDeparture = models.ScheduledDeparture
+type TripInfo = models.TripInfo
+type ArrivalResult = models.ArrivalResult
+type ScheduleCandidate = models.ScheduleCandidate
+
+type upstreamError struct {
+	Path       string
+	StatusCode int
 }
 
-// TripStop mirrors gtfs-static's store.TripStop.
-type TripStop struct {
-	StopID        string `json:"stopId"`
-	ArrivalTime   int64  `json:"arrivalTime"`   // nanoseconds from midnight
-	DepartureTime int64  `json:"departureTime"` // nanoseconds from midnight
-}
-
-// TripInfo mirrors gtfs-static's store.TripInfo.
-type TripInfo struct {
-	TripID    string     `json:"tripId"`
-	RouteID   string     `json:"routeId"`
-	ServiceID string     `json:"serviceId"`
-	Stops     []TripStop `json:"stops"`
-}
-
-// ArrivalResult mirrors gtfs-static's store.ArrivalResult.
-type ArrivalResult struct {
-	Duration int64 `json:"duration"` // nanoseconds
-	OK       bool  `json:"ok"`
+func (e *upstreamError) Error() string {
+	return fmt.Sprintf("static client GET %s: status %d", e.Path, e.StatusCode)
 }
 
 // StaticClient is an HTTP client for the gtfs-static microservice with
@@ -50,6 +34,8 @@ type StaticClient struct {
 	baseURL string
 	client  *http.Client
 
+	cacheMu      sync.Mutex
+	gtfsVersion  string
 	routeCache   sync.Map // routeID → models.Route
 	tripCache    sync.Map // tripID → TripInfo
 	nameCache    sync.Map // stopID → string
@@ -67,34 +53,44 @@ func NewStaticClient(baseURL string) *StaticClient {
 }
 
 func (sc *StaticClient) get(path string) ([]byte, error) {
-	resp, err := sc.client.Get(sc.baseURL + path)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, sc.baseURL+path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build static client GET %s: %w", path, err)
+	}
+
+	resp, err := sc.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("static client GET %s: %w", path, err)
 	}
 	defer resp.Body.Close()
+	sc.updateGTFSVersion(resp.Header.Get("X-GTFS-Version"))
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("static client GET %s: status %d", path, resp.StatusCode)
+		return nil, &upstreamError{Path: path, StatusCode: resp.StatusCode}
 	}
 	return io.ReadAll(resp.Body)
 }
 
-// ScheduleCandidate mirrors gtfs-static's store.ScheduleCandidate.
-type ScheduleCandidate struct {
-	TripID         string   `json:"tripId"`
-	TripNumber     string   `json:"tripNumber"`
-	RouteShortName string   `json:"routeShortName"`
-	RouteLongName  string   `json:"routeLongName"`
-	RouteColor     string   `json:"routeColor"`
-	RouteType      int      `json:"routeType"`
-	Headsign       string   `json:"headsign"`
-	ScheduledTime  string   `json:"scheduledTime"`
-	Platform       string   `json:"platform"`
-	Stops          []string `json:"stops"`
-	LastStopID     string   `json:"lastStopId"`
-	IsExpress      bool     `json:"isExpress"`
-	StopID         string   `json:"stopId"`
-	DepartureNano  int64    `json:"departureNano"`
-	ServiceDay     string   `json:"serviceDay"`
+func (sc *StaticClient) updateGTFSVersion(version string) {
+	if version == "" {
+		return
+	}
+
+	sc.cacheMu.Lock()
+	defer sc.cacheMu.Unlock()
+
+	if sc.gtfsVersion == "" {
+		sc.gtfsVersion = version
+		return
+	}
+	if sc.gtfsVersion == version {
+		return
+	}
+
+	sc.gtfsVersion = version
+	sc.routeCache = sync.Map{}
+	sc.tripCache = sync.Map{}
+	sc.nameCache = sync.Map{}
+	sc.serviceCache = sync.Map{}
 }
 
 // GetStops proxies the /stops endpoint from gtfs-static, returning raw JSON.
@@ -114,9 +110,10 @@ func (sc *StaticClient) Ready(ctx context.Context) error {
 		return fmt.Errorf("gtfs-static readiness request failed: %w", err)
 	}
 	defer resp.Body.Close()
+	sc.updateGTFSVersion(resp.Header.Get("X-GTFS-Version"))
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("gtfs-static readiness returned %d", resp.StatusCode)
+		return &upstreamError{Path: "/ready", StatusCode: resp.StatusCode}
 	}
 
 	return nil
@@ -124,13 +121,13 @@ func (sc *StaticClient) Ready(ctx context.Context) error {
 
 // GetSchedule returns pre-filtered departure candidates for a stop code.
 // All filtering (last stop, service active, time window, dedup) is done server-side.
-func (sc *StaticClient) GetSchedule(code string, now time.Time) ([]ScheduleCandidate, error) {
+func (sc *StaticClient) GetSchedule(code string, now time.Time) ([]models.ScheduleCandidate, error) {
 	path := "/schedule/" + url.PathEscape(code) + "?now=" + fmt.Sprintf("%d", now.Unix())
 	data, err := sc.get(path)
 	if err != nil {
 		return nil, err
 	}
-	var candidates []ScheduleCandidate
+	var candidates []models.ScheduleCandidate
 	if err := json.Unmarshal(data, &candidates); err != nil {
 		return nil, fmt.Errorf("decode schedule: %w", err)
 	}
@@ -151,12 +148,12 @@ func (sc *StaticClient) StopIDsForCode(code string) ([]string, error) {
 }
 
 // DeparturesForStop returns scheduled departures for a stop ID.
-func (sc *StaticClient) DeparturesForStop(stopID string) ([]ScheduledDeparture, error) {
+func (sc *StaticClient) DeparturesForStop(stopID string) ([]models.ScheduledDeparture, error) {
 	data, err := sc.get("/departures/" + url.PathEscape(stopID))
 	if err != nil {
 		return nil, err
 	}
-	var deps []ScheduledDeparture
+	var deps []models.ScheduledDeparture
 	if err := json.Unmarshal(data, &deps); err != nil {
 		return nil, fmt.Errorf("decode departures: %w", err)
 	}
@@ -164,17 +161,17 @@ func (sc *StaticClient) DeparturesForStop(stopID string) ([]ScheduledDeparture, 
 }
 
 // getTrip returns trip info, using the in-memory cache.
-func (sc *StaticClient) getTrip(tripID string) (TripInfo, bool) {
+func (sc *StaticClient) getTrip(tripID string) (models.TripInfo, bool) {
 	if v, ok := sc.tripCache.Load(tripID); ok {
-		return v.(TripInfo), true
+		return v.(models.TripInfo), true
 	}
 	data, err := sc.get("/trips/" + url.PathEscape(tripID))
 	if err != nil {
-		return TripInfo{}, false
+		return models.TripInfo{}, false
 	}
-	var trip TripInfo
+	var trip models.TripInfo
 	if err := json.Unmarshal(data, &trip); err != nil {
-		return TripInfo{}, false
+		return models.TripInfo{}, false
 	}
 	sc.tripCache.Store(tripID, trip)
 	return trip, true

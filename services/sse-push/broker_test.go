@@ -92,3 +92,21 @@ func TestBrokerClientCount(t *testing.T) {
 		t.Fatalf("expected 0 clients, got %d", got)
 	}
 }
+
+func TestBrokerTrySubscribeHonorsClientCap(t *testing.T) {
+	b := NewBroker()
+
+	first, ok := b.TrySubscribe(1)
+	if !ok {
+		t.Fatal("expected first subscribe to succeed")
+	}
+	defer b.Unsubscribe(first)
+
+	second, ok := b.TrySubscribe(1)
+	if ok {
+		t.Fatal("expected second subscribe to be rejected")
+	}
+	if second != nil {
+		t.Fatal("expected rejected subscribe to return nil channel")
+	}
+}

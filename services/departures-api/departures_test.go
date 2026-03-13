@@ -92,3 +92,23 @@ func TestNetworkHealthComputation(t *testing.T) {
 	}
 }
 
+func TestIsStopCancelledUsesStopCodes(t *testing.T) {
+	if !isStopCancelled([]string{"UN"}, "UN") {
+		t.Fatal("expected matching stop code to be cancelled")
+	}
+	if isStopCancelled([]string{"UN"}, "UN_PLATFORM_1") {
+		t.Fatal("expected GTFS stop ID not to match stop code")
+	}
+	if !isStopCancelled([]string{}, "UN") {
+		t.Fatal("expected empty cancellation list to mean whole-trip cancellation")
+	}
+}
+
+func TestDepartureStatusHandlesEarlyTrips(t *testing.T) {
+	if got := departureStatus(true, "", -4); got != "Early 4m" {
+		t.Fatalf("expected early status, got %q", got)
+	}
+	if got := departureStatus(true, "CANCELED", -4); got != "Cancelled" {
+		t.Fatalf("expected cancellation to take precedence, got %q", got)
+	}
+}

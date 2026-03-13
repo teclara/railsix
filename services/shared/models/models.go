@@ -41,8 +41,8 @@ type Departure struct {
 	RouteColor    string   `json:"routeColor,omitempty"`
 	DelayMinutes  int      `json:"delayMinutes,omitempty"`
 	Stops         []string `json:"stops,omitempty"`
-	LastStopID    string   `json:"lastStopId,omitempty"` // stop code of final destination
-	Cars          string   `json:"cars,omitempty"` // number of coaches
+	LastStopCode  string   `json:"lastStopCode,omitempty"` // public stop code of final destination
+	Cars          string   `json:"cars,omitempty"`         // number of coaches
 	IsInMotion    bool     `json:"isInMotion,omitempty"`
 	IsCancelled   bool     `json:"isCancelled,omitempty"`
 	IsExpress     bool     `json:"isExpress,omitempty"`
@@ -52,15 +52,24 @@ type Departure struct {
 
 // NextServiceLine is a single real-time next-service entry from Metrolinx NextService API.
 type NextServiceLine struct {
-	LineCode       string `json:"lineCode"`
-	LineName       string `json:"lineName"`
-	Direction      string `json:"direction"`
-	ScheduledTime  string `json:"scheduledTime"` // "HH:MM"
-	ComputedTime   string `json:"computedTime"`  // "HH:MM" real-time adjusted
-	Platform       string `json:"platform,omitempty"`
-	ActualPlatform string `json:"actualPlatform,omitempty"`
-	TripNumber     string `json:"tripNumber"`
-	Status         string `json:"status"` // "On Time", "Delayed", "Moving"
+	StopCode        string  `json:"stopCode"`
+	LineCode        string  `json:"lineCode"`
+	LineName        string  `json:"lineName"`
+	ServiceType     string  `json:"serviceType"`
+	DirectionCode   string  `json:"directionCode"`
+	Direction       string  `json:"direction"`
+	ScheduledTime   string  `json:"scheduledTime"` // "HH:MM"
+	ComputedTime    string  `json:"computedTime"`  // "HH:MM" real-time adjusted
+	DepartureStatus string  `json:"departureStatus"`
+	Platform        string  `json:"platform,omitempty"`
+	ActualPlatform  string  `json:"actualPlatform,omitempty"`
+	TripOrder       int     `json:"tripOrder"`
+	TripNumber      string  `json:"tripNumber"`
+	Status          string  `json:"status"` // normalized status for app/UI
+	RawStatus       string  `json:"rawStatus"`
+	UpdateTime      string  `json:"updateTime"`
+	Lat             float64 `json:"lat,omitempty"`
+	Lon             float64 `json:"lon,omitempty"`
 }
 
 // UnionDeparture is a single departure from the Union Station departures board.
@@ -83,14 +92,26 @@ type NetworkLine struct {
 
 // ServiceGlanceEntry holds cached data from the ServiceataGlance/Trains/All endpoint.
 type ServiceGlanceEntry struct {
-	TripNumber   string  `json:"tripNumber"`
-	LineCode     string  `json:"lineCode"`
-	LineName     string  `json:"lineName"`
-	Cars         string  `json:"cars"`
-	DelaySeconds int     `json:"delaySeconds"`
-	Lat          float64 `json:"lat"`
-	Lon          float64 `json:"lon"`
-	IsInMotion   bool    `json:"isInMotion"`
+	TripNumber          string  `json:"tripNumber"`
+	LineCode            string  `json:"lineCode"`
+	LineName            string  `json:"lineName"`
+	Cars                string  `json:"cars"`
+	StartTime           string  `json:"startTime,omitempty"`
+	EndTime             string  `json:"endTime,omitempty"`
+	RouteNumber         string  `json:"routeNumber,omitempty"`
+	VariantDirection    string  `json:"variantDirection,omitempty"`
+	DelaySeconds        int     `json:"delaySeconds"`
+	OccupancyPercentage int     `json:"occupancyPercentage,omitempty"`
+	Lat                 float64 `json:"lat"`
+	Lon                 float64 `json:"lon"`
+	Course              float64 `json:"course,omitempty"`
+	FirstStopCode       string  `json:"firstStopCode,omitempty"`
+	LastStopCode        string  `json:"lastStopCode,omitempty"`
+	PrevStopCode        string  `json:"prevStopCode,omitempty"`
+	NextStopCode        string  `json:"nextStopCode,omitempty"`
+	AtStationCode       string  `json:"atStationCode,omitempty"`
+	IsInMotion          bool    `json:"isInMotion"`
+	ModifiedDate        string  `json:"modifiedDate,omitempty"`
 }
 
 type Alert struct {

@@ -23,11 +23,21 @@ func NewBroker() *Broker {
 
 // Subscribe creates a buffered channel and registers it for broadcasts.
 func (b *Broker) Subscribe() chan SSEEvent {
+	ch, _ := b.TrySubscribe(0)
+	return ch
+}
+
+// TrySubscribe registers a client if the broker is below the max client cap.
+// A maxClients value of 0 disables the cap.
+func (b *Broker) TrySubscribe(maxClients int) (chan SSEEvent, bool) {
 	ch := make(chan SSEEvent, 64)
 	b.mu.Lock()
+	defer b.mu.Unlock()
+	if maxClients > 0 && len(b.clients) >= maxClients {
+		return nil, false
+	}
 	b.clients[ch] = struct{}{}
-	b.mu.Unlock()
-	return ch
+	return ch, true
 }
 
 // Unsubscribe removes a client channel from the broker and closes it.

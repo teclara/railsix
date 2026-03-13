@@ -44,7 +44,7 @@ func DownloadURL(ctx context.Context, rawURL string) ([]byte, error) {
 		return nil, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, rawURL)
 	}
 	const maxBytes = 50 * 1024 * 1024 // 50 MB
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("reading response from %s: %w", rawURL, err)
 	}

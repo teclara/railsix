@@ -1,6 +1,7 @@
 package store
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -13,48 +14,26 @@ import (
 	"github.com/teclara/railsix/shared/models"
 )
 
-// ScheduledDeparture is a single stop-time entry in the schedule index.
-type ScheduledDeparture struct {
-	TripID        string `json:"tripId"`
-	RouteID       string `json:"routeId"`
-	ServiceID     string `json:"serviceId"`
-	Headsign      string `json:"headsign"`
-	DepartureTime int64  `json:"departureTime"` // nanoseconds from midnight (local time)
-}
-
-// TripStop is one stop in a trip's ordered sequence.
-type TripStop struct {
-	StopID        string `json:"stopId"`
-	ArrivalTime   int64  `json:"arrivalTime"`   // nanoseconds from midnight of service day
-	DepartureTime int64  `json:"departureTime"` // nanoseconds from midnight of service day
-}
-
-// TripInfo holds a trip's identity and full stop sequence for departure enrichment.
-type TripInfo struct {
-	TripID    string     `json:"tripId"`
-	RouteID   string     `json:"routeId"`
-	ServiceID string     `json:"serviceId"`
-	Stops     []TripStop `json:"stops"`
-}
-
-// ArrivalResult is the JSON-serializable result of an arrival time query.
-type ArrivalResult struct {
-	Duration int64 `json:"duration"` // nanoseconds
-	OK       bool  `json:"ok"`
-}
+type ScheduledDeparture = models.ScheduledDeparture
+type TripStop = models.TripStop
+type TripInfo = models.TripInfo
+type ArrivalResult = models.ArrivalResult
+type ScheduleCandidate = models.ScheduleCandidate
 
 // StaticStore holds parsed GTFS static data with thread-safe access.
 type StaticStore struct {
-	mu        sync.RWMutex
-	loaded    bool // true once GTFS data has been successfully loaded at least once
-	stops     []models.Stop
-	stopNames map[string]string // stopID → name
-	routes    map[string]models.Route
-	stopIndex map[string][]ScheduledDeparture // stopID → sorted departures
-	stopCodes map[string][]string             // stopCode → []stopID (parent + children)
-	services  map[string]gtfs.Service         // serviceID → service
-	tripIndex     map[string]TripInfo // tripID → TripInfo
-	maxRouteStops map[string]int      // routeID|firstStop|lastStop → max stop count
+	mu            sync.RWMutex
+	loaded        bool // true once GTFS data has been successfully loaded at least once
+	version       string
+	stops         []models.Stop
+	stopNames     map[string]string // stopID → name
+	stopCodeByID  map[string]string // stopID → public stop code
+	routes        map[string]models.Route
+	stopIndex     map[string][]ScheduledDeparture // stopID → sorted departures
+	stopCodes     map[string][]string             // stopCode → []stopID (parent + children)
+	services      map[string]gtfs.Service         // serviceID → service
+	tripIndex     map[string]TripInfo             // tripID → TripInfo
+	maxRouteStops map[string]int                  // routeID|firstStop|lastStop → max stop count
 }
 
 // NewStaticStore creates a StaticStore and loads the given GTFS ZIP data.
@@ -81,16 +60,29 @@ func (s *StaticStore) Ready() bool {
 	return s.loaded
 }
 
+// Version returns the current GTFS dataset fingerprint.
+func (s *StaticStore) Version() string {
+	if s == nil {
+		return ""
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.version
+}
+
 func (s *StaticStore) load(zipData []byte) error {
 	static, err := gtfs.ParseStatic(zipData, gtfs.ParseStaticOptions{})
 	if err != nil {
 		return fmt.Errorf("parsing GTFS static: %w", err)
 	}
+	version := fmt.Sprintf("%x", sha256.Sum256(zipData))
 
 	// --- Stop names (needed by schedule queries regardless of filtering) ---
 	stopNames := make(map[string]string, len(static.Stops))
+	stopCodeByID := make(map[string]string, len(static.Stops))
 	for i := range static.Stops {
 		stopNames[static.Stops[i].Id] = static.Stops[i].Name
+		stopCodeByID[static.Stops[i].Id] = static.Stops[i].Code
 	}
 
 	// --- Routes ---
@@ -161,6 +153,10 @@ func (s *StaticStore) load(zipData []byte) error {
 				continue
 			}
 			stopID := intern.intern(st.Stop.Id)
+			stopCode := stopCodeByID[stopID]
+			if stopCode == "" {
+				stopCode = stopID
+			}
 			stopIndex[stopID] = append(stopIndex[stopID], ScheduledDeparture{
 				TripID:        tripID,
 				RouteID:       routeID,
@@ -170,6 +166,7 @@ func (s *StaticStore) load(zipData []byte) error {
 			})
 			tripStops = append(tripStops, TripStop{
 				StopID:        stopID,
+				StopCode:      stopCode,
 				ArrivalTime:   int64(st.ArrivalTime),
 				DepartureTime: int64(st.DepartureTime),
 			})
@@ -236,6 +233,7 @@ func (s *StaticStore) load(zipData []byte) error {
 	s.mu.Lock()
 	s.stops = stops
 	s.stopNames = stopNames
+	s.stopCodeByID = stopCodeByID
 	s.routes = routes
 	s.stopIndex = stopIndex
 	s.stopCodes = stopCodes
@@ -243,6 +241,7 @@ func (s *StaticStore) load(zipData []byte) error {
 	s.tripIndex = tripIndex
 	s.maxRouteStops = maxRouteStops
 	s.loaded = true
+	s.version = version
 	s.mu.Unlock()
 
 	slog.Info("GTFS static loaded",
@@ -298,7 +297,7 @@ func (s *StaticStore) GetStopName(id string) string {
 }
 
 // GetTrip returns trip info for a trip ID.
-func (s *StaticStore) GetTrip(tripID string) (TripInfo, bool) {
+func (s *StaticStore) GetTrip(tripID string) (models.TripInfo, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	t, ok := s.tripIndex[tripID]
@@ -387,37 +386,18 @@ func (s *StaticStore) StopIDsForCode(code string) []string {
 }
 
 // DeparturesForStop returns scheduled departures for a stop ID.
-func (s *StaticStore) DeparturesForStop(stopID string) []ScheduledDeparture {
+func (s *StaticStore) DeparturesForStop(stopID string) []models.ScheduledDeparture {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	src := s.stopIndex[stopID]
-	out := make([]ScheduledDeparture, len(src))
+	out := make([]models.ScheduledDeparture, len(src))
 	copy(out, src)
 	return out
 }
 
-// ScheduleCandidate is a pre-filtered departure candidate returned by ScheduleForStop.
-type ScheduleCandidate struct {
-	TripID         string   `json:"tripId"`
-	TripNumber     string   `json:"tripNumber"`
-	RouteShortName string   `json:"routeShortName"`
-	RouteLongName  string   `json:"routeLongName"`
-	RouteColor     string   `json:"routeColor"`
-	RouteType      int      `json:"routeType"`
-	Headsign       string   `json:"headsign"`
-	ScheduledTime  string   `json:"scheduledTime"` // "HH:MM"
-	Platform       string   `json:"platform"`
-	Stops          []string `json:"stops"`       // remaining stop names after departure
-	LastStopID     string   `json:"lastStopId"` // stop code of final destination
-	IsExpress      bool     `json:"isExpress"`
-	StopID         string   `json:"stopId"`
-	DepartureNano  int64    `json:"departureNano"` // nanoseconds from midnight of service day
-	ServiceDay     string   `json:"serviceDay"`    // "YYYY-MM-DD"
-}
-
 // ScheduleForStop returns pre-filtered departure candidates for a stop code,
 // doing all filtering (last stop, service active, time window) in-memory.
-func (s *StaticStore) ScheduleForStop(code string, now time.Time, lookAhead time.Duration) []ScheduleCandidate {
+func (s *StaticStore) ScheduleForStop(code string, now time.Time, lookAhead time.Duration) []models.ScheduleCandidate {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -483,7 +463,7 @@ func (s *StaticStore) ScheduleForStop(code string, now time.Time, lookAhead time
 	seenTrip := make(map[string]bool)
 	seenTimeLine := make(map[string]bool)
 	const maxResults = 20
-	result := make([]ScheduleCandidate, 0, maxResults)
+	result := make([]models.ScheduleCandidate, 0, maxResults)
 
 	for i := range candidates {
 		c := &candidates[i]
@@ -529,13 +509,21 @@ func (s *StaticStore) ScheduleForStop(code string, now time.Time, lookAhead time
 			}
 		}
 
-		// Last stop ID for destination identification.
-		var lastStopID string
+		// Last stop code for destination identification.
+		var lastStopCode string
 		if len(trip.Stops) > 0 {
-			lastStopID = trip.Stops[len(trip.Stops)-1].StopID
+			lastStopCode = trip.Stops[len(trip.Stops)-1].StopCode
+			if lastStopCode == "" {
+				lastStopCode = trip.Stops[len(trip.Stops)-1].StopID
+			}
 		}
 
-		result = append(result, ScheduleCandidate{
+		stopCode := s.stopCodeByID[c.stopID]
+		if stopCode == "" {
+			stopCode = c.stopID
+		}
+
+		result = append(result, models.ScheduleCandidate{
 			TripID:         c.dep.TripID,
 			TripNumber:     tripNum,
 			RouteShortName: route.ShortName,
@@ -546,9 +534,10 @@ func (s *StaticStore) ScheduleForStop(code string, now time.Time, lookAhead time
 			ScheduledTime:  fmtTime(c.serviceDay.Add(time.Duration(c.dep.DepartureTime))),
 			Platform:       platform,
 			Stops:          stops,
-			LastStopID:     lastStopID,
+			LastStopCode:   lastStopCode,
 			IsExpress:      isExpress,
 			StopID:         c.stopID,
+			StopCode:       stopCode,
 			DepartureNano:  c.dep.DepartureTime,
 			ServiceDay:     c.serviceDay.Format("2006-01-02"),
 		})
@@ -569,7 +558,6 @@ func truncateDay(t time.Time) time.Time {
 func fmtTime(t time.Time) string {
 	return fmt.Sprintf("%02d:%02d", t.Hour(), t.Minute())
 }
-
 
 func extractPlat(stopName string) string {
 	const prefix = "Platform "

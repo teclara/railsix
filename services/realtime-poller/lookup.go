@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -15,10 +16,11 @@ import (
 // httpRouteLookup resolves route IDs by calling the gtfs-static service over HTTP.
 // Routes are cached in-memory since they only change on GTFS refresh (every 24h).
 type httpRouteLookup struct {
-	baseURL string
-	client  *http.Client
-	mu      sync.RWMutex
-	cache   map[string]models.Route
+	baseURL     string
+	client      *http.Client
+	mu          sync.RWMutex
+	cache       map[string]models.Route
+	gtfsVersion string
 }
 
 func newHTTPRouteLookup(baseURL string) *httpRouteLookup {
@@ -42,6 +44,7 @@ func (l *httpRouteLookup) Ready(ctx context.Context) error {
 		return fmt.Errorf("gtfs-static readiness request failed: %w", err)
 	}
 	defer resp.Body.Close()
+	l.refreshVersion(resp.Header.Get("X-GTFS-Version"))
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("gtfs-static readiness returned %d", resp.StatusCode)
@@ -59,13 +62,14 @@ func (l *httpRouteLookup) GetRoute(id string) (models.Route, bool) {
 	}
 	l.mu.RUnlock()
 
-	url := fmt.Sprintf("%s/routes/%s", l.baseURL, id)
-	resp, err := l.client.Get(url)
+	routeURL := fmt.Sprintf("%s/routes/%s", l.baseURL, url.PathEscape(id))
+	resp, err := l.client.Get(routeURL)
 	if err != nil {
 		slog.Debug("route lookup request failed", "routeID", id, "error", err)
 		return models.Route{}, false
 	}
 	defer resp.Body.Close()
+	l.refreshVersion(resp.Header.Get("X-GTFS-Version"))
 
 	if resp.StatusCode != http.StatusOK {
 		return models.Route{}, false
@@ -81,4 +85,24 @@ func (l *httpRouteLookup) GetRoute(id string) (models.Route, bool) {
 	l.cache[id] = route
 	l.mu.Unlock()
 	return route, true
+}
+
+func (l *httpRouteLookup) refreshVersion(version string) {
+	if version == "" {
+		return
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.gtfsVersion == "" {
+		l.gtfsVersion = version
+		return
+	}
+	if l.gtfsVersion == version {
+		return
+	}
+
+	l.gtfsVersion = version
+	l.cache = make(map[string]models.Route)
 }
