@@ -135,14 +135,16 @@ export async function openSSE(ip: string, maxConnections: number): Promise<boole
 
 	try {
 		const count = await client.incr(key);
-		await client.expire(key, SSE_TTL_SECONDS);
 		if (count > maxConnections) {
+			// Roll back — don't refresh TTL on rejected connections or the key
+			// can never expire while a client keeps reconnecting.
 			const remaining = await client.decr(key);
 			if (remaining <= 0) {
 				await client.del(key);
 			}
 			return false;
 		}
+		await client.expire(key, SSE_TTL_SECONDS);
 		return true;
 	} catch (error) {
 		logRedisWarning(error);
