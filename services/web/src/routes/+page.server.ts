@@ -24,13 +24,13 @@ export async function load({ url }: { url: URL }) {
 		} | null = null;
 
 		if (from && to && (dir === 'toWork' || dir === 'toHome')) {
-			const fromStop = stops.find((s) => s.code === from);
-			const toStop = stops.find((s) => s.code === to);
+			const fromStop = stops.find((s) => (s.code || s.id) === from);
+			const toStop = stops.find((s) => (s.code || s.id) === to);
 			if (fromStop && toStop) {
 				urlTrip = {
-					fromCode: fromStop.code,
+					fromCode: fromStop.code || fromStop.id,
 					fromName: fromStop.name,
-					toCode: toStop.code,
+					toCode: toStop.code || toStop.id,
 					toName: toStop.name,
 					dir
 				};

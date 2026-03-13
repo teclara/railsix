@@ -103,4 +103,22 @@ describe('homepage server load', () => {
 		const result = await load({ url } as any);
 		expect(result.urlTrip).toBeNull();
 	});
+
+	it('resolves urlTrip using id fallback when code is empty', async () => {
+		vi.mocked(getAllStops).mockResolvedValue([
+			{ code: '', id: 'UN', name: 'Union' },
+			{ code: '', id: 'OA', name: 'Oakville' }
+		]);
+		vi.mocked(getAlerts).mockResolvedValue([]);
+
+		const url = new URL('http://localhost/?from=UN&to=OA&dir=toHome');
+		const result = await load({ url } as any);
+		expect(result.urlTrip).toEqual({
+			fromCode: 'UN',
+			fromName: 'Union',
+			toCode: 'OA',
+			toName: 'Oakville',
+			dir: 'toHome'
+		});
+	});
 });

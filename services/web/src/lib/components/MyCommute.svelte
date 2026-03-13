@@ -23,18 +23,23 @@
 	let { stops, alerts: initialAlerts }: { stops: Stop[]; alerts: Alert[] } = $props();
 
 	// Derive urlTrip from the actual URL — stays in sync with replaceState
+	// Match on code or id (stops may have empty code, using id as fallback)
+	function findStop(stops: Stop[], val: string) {
+		return stops.find((s) => (s.code || s.id) === val);
+	}
+
 	let urlTrip = $derived.by(() => {
 		const from = page.url.searchParams.get('from');
 		const to = page.url.searchParams.get('to');
 		const dir = page.url.searchParams.get('dir');
 		if (!from || !to || (dir !== 'toWork' && dir !== 'toHome')) return null;
-		const fromStop = stops.find((s) => s.code === from);
-		const toStop = stops.find((s) => s.code === to);
+		const fromStop = findStop(stops, from);
+		const toStop = findStop(stops, to);
 		if (!fromStop || !toStop) return null;
 		return {
-			fromCode: fromStop.code,
+			fromCode: fromStop.code || fromStop.id,
 			fromName: fromStop.name,
-			toCode: toStop.code,
+			toCode: toStop.code || toStop.id,
 			toName: toStop.name,
 			dir: dir as 'toWork' | 'toHome'
 		};
@@ -180,9 +185,12 @@
 		commute.hydrate();
 		mounted = true;
 		// Sync URL to reflect active commute after hydrate
-		if (!isUrlMode && activeTrip) {
-			syncUrl(activeTrip, activeDirection);
-		}
+		// Deferred to ensure SvelteKit router is initialized before replaceState
+		setTimeout(() => {
+			if (!isUrlMode && activeTrip) {
+				syncUrl(activeTrip, activeDirection);
+			}
+		}, 0);
 		// Departures load is handled by the $effect reacting to activeTrip after hydrate.
 		departInterval = setInterval(loadDepartures, 30_000);
 		alertInterval = setInterval(() => void loadAlerts(), ALERT_REFRESH_INTERVAL_MS);
