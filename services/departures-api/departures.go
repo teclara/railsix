@@ -106,7 +106,9 @@ func GetDepartures(ctx context.Context, stopCode, destCode string, now time.Time
 
 		// Enrich with service glance data.
 		if sg, ok := glanceAll[c.TripNumber]; ok {
-			dep.Cars = sg.Cars
+			if sg.Cars != "-" {
+				dep.Cars = sg.Cars
+			}
 			dep.IsInMotion = sg.IsInMotion
 			// Use ServiceGlance delay as fallback when GTFS-RT has no delay.
 			if delay == 0 && sg.DelaySeconds > 0 {

@@ -30,7 +30,6 @@ export type Departure = {
 	stops?: string[];
 	lastStopId?: string;
 	cars?: string;
-	isInMotion?: boolean;
 	isCancelled?: boolean;
 	isExpress?: boolean;
 	alert?: string;
@@ -65,7 +64,6 @@ export type UnionDeparture = {
 	info: string;
 	stops: string[];
 	cars?: string;
-	isInMotion?: boolean;
 	isCancelled?: boolean;
 	alert?: string;
 };

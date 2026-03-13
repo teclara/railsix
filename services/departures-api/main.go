@@ -299,7 +299,9 @@ func handleUnionDepartures(rc *RedisClient) http.HandlerFunc {
 				Alert:       alertTexts[lineCodeForService[strings.ToUpper(d.Service)]],
 			}
 			if sg, ok := rc.GetServiceGlanceEntry(r.Context(), d.TripNumber); ok {
-				slim[i].Cars = sg.Cars
+				if sg.Cars != "-" {
+					slim[i].Cars = sg.Cars
+				}
 				slim[i].IsInMotion = sg.IsInMotion
 			}
 			if rc.IsTripCancelled(r.Context(), d.TripNumber) {

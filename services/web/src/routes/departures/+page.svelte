@@ -196,11 +196,7 @@
 
 	type MetaPart = { text: string; cls: string };
 
-	function buildMetaParts(dep: {
-		isInMotion?: boolean;
-		alert?: string;
-		stops?: string[];
-	}): MetaPart[] {
+	function buildMetaParts(dep: { alert?: string; stops?: string[] }): MetaPart[] {
 		const parts: MetaPart[] = [];
 		if (dep.stops && dep.stops.length > 0)
 			parts.push({ text: dep.stops.join(' · '), cls: 'text-gray-400' });
