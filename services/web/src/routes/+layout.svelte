@@ -27,7 +27,13 @@
 	function dismissInstall() {
 		showInstallBanner = false;
 		localStorage.setItem('installDismissed', Date.now().toString());
-		track('install-dismissed');
+	}
+
+	function onInstallPromptShown() {
+		showInstallBanner = true;
+		track('add_to_home_screen_prompt_seen', {
+			prompt_type: deferredPrompt ? 'native' : 'ios_manual'
+		});
 	}
 
 	async function installApp() {
@@ -36,7 +42,7 @@
 			const result = await deferredPrompt.userChoice;
 			if (result.outcome === 'accepted') {
 				showInstallBanner = false;
-				track('install-accepted');
+				track('add_to_home_screen_completed', { platform: 'android' });
 			}
 			deferredPrompt = null;
 		} else {
@@ -141,14 +147,14 @@
 				window.addEventListener('beforeinstallprompt', (e: Event) => {
 					e.preventDefault();
 					deferredPrompt = e;
-					showInstallBanner = true;
+					onInstallPromptShown();
 				});
 
 				// iOS: show banner after 3 seconds (no beforeinstallprompt on iOS)
 				const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 				if (isIOS) {
 					setTimeout(() => {
-						if (!showInstallBanner) showInstallBanner = true;
+						if (!showInstallBanner) onInstallPromptShown();
 					}, 3000);
 				}
 			}

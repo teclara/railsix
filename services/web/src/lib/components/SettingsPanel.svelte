@@ -89,7 +89,7 @@
 		if (homeOrigin && homeDest) {
 			commute.setTrip('toHome', tripFromStops(homeOrigin, homeDest));
 		}
-		track('settings-save');
+		track('saved_commute', { save_type: 'settings' });
 		// Navigate to the updated trip URL
 		if (workOrigin && workDest) {
 			const from = workOrigin.code || workOrigin.id;
@@ -101,7 +101,7 @@
 
 	function clearAll() {
 		commute.clear();
-		track('settings-clear-all');
+		track('commute_cleared');
 		void goto('/', { replaceState: true });
 		onClose();
 	}
@@ -141,13 +141,19 @@
 						{stops}
 						bind:value={workOriginQuery}
 						placeholder="From"
-						onSelect={(s) => (workOrigin = s)}
+						onSelect={(s) => {
+							workOrigin = s;
+							track('station_selected', { station: s.name, selection_method: 'search' });
+						}}
 					/>
 					<StationSearchInput
 						{stops}
 						bind:value={workDestQuery}
 						placeholder="To"
-						onSelect={(s) => (workDest = s)}
+						onSelect={(s) => {
+							workDest = s;
+							track('station_selected', { station: s.name, selection_method: 'search' });
+						}}
 					/>
 				</div>
 			</section>
@@ -160,13 +166,19 @@
 						{stops}
 						bind:value={homeOriginQuery}
 						placeholder="From"
-						onSelect={(s) => (homeOrigin = s)}
+						onSelect={(s) => {
+							homeOrigin = s;
+							track('station_selected', { station: s.name, selection_method: 'search' });
+						}}
 					/>
 					<StationSearchInput
 						{stops}
 						bind:value={homeDestQuery}
 						placeholder="To"
-						onSelect={(s) => (homeDest = s)}
+						onSelect={(s) => {
+							homeDest = s;
+							track('station_selected', { station: s.name, selection_method: 'search' });
+						}}
 					/>
 				</div>
 			</section>

@@ -9,6 +9,7 @@
 	} from '$lib/api-client';
 	import type { Stop } from '$lib/api';
 	import { stopToSlug, stopToDisplayName, stopToSeoName } from '$lib/stations';
+	import { track } from '$lib/track';
 	import SplitFlapChar from '$lib/components/SplitFlapChar.svelte';
 	import {
 		departureDisplayTime,
@@ -87,6 +88,7 @@
 	let allGtfsDepartures = $state<Departure[]>([]);
 	let stationAlert = $state('');
 	let fetchError = $state(false);
+	let loaded = $state(false);
 
 	let trainDepartures = $derived(
 		allGtfsDepartures.filter((d) => d.routeType !== 3).slice(0, isFullscreen ? 10 : 15)
@@ -105,9 +107,16 @@
 			allGtfsDepartures = sortByScheduledTime(result.departures);
 			stationAlert = result.stationAlert ?? '';
 			fetchError = false;
+			loaded = true;
 		} catch (err) {
 			if (controller.signal.aborted) return;
 			fetchError = true;
+			loaded = true;
+			track('error_viewed', {
+				error_type: 'fetch_departures',
+				surface: 'departures',
+				station: data.stationCode
+			});
 			console.error('Failed to load departures:', err);
 		}
 	}
@@ -115,6 +124,7 @@
 	function selectStation(stop: Stop) {
 		dropdownOpen = false;
 		searchQuery = '';
+		track('station_selected', { station: stop.name, selection_method: 'search' });
 		goto(`/departures/${stopToSlug(stop)}`);
 	}
 
@@ -189,6 +199,20 @@
 
 	let mobileQuery: MediaQueryList;
 
+	// Analytics: empty_state_viewed — fire when no departures after data loads
+	let emptyStateTracked = false;
+	$effect(() => {
+		if (loaded && trainDepartures.length === 0 && !fetchError && !emptyStateTracked) {
+			emptyStateTracked = true;
+			track('empty_state_viewed', {
+				station: data.stationCode,
+				empty_reason: 'no_departures',
+				surface: 'departures'
+			});
+		}
+		if (trainDepartures.length > 0) emptyStateTracked = false;
+	});
+
 	onMount(() => {
 		updateClock();
 		clockInterval = setInterval(updateClock, 1000);
@@ -201,6 +225,8 @@
 		mobileQuery = window.matchMedia('(max-width: 480px)');
 		isMobile = mobileQuery.matches;
 		mobileQuery.addEventListener('change', (e) => (isMobile = e.matches));
+
+		track('landing_viewed', { entry_type: 'departures_direct', station: data.stationCode });
 	});
 
 	onDestroy(() => {
