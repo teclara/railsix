@@ -11,8 +11,14 @@
 	import { fetchAlerts, fetchDepartures } from '$lib/api-client';
 	import { normalizeAlerts } from '$lib/alerts';
 	import { onSSE, onSSEStatus } from '$lib/sse';
-	import { departureDisplayTime, isUpcomingDeparture, torontoHour, torontoNow } from '$lib/display';
-	import { track } from '$lib/track';
+	import {
+		departureDisplayTime,
+		departureTargetMs,
+		isUpcomingDeparture,
+		torontoHour,
+		torontoNow
+	} from '$lib/display';
+	import { track, trackCountdownViewed, getLeadTimeBucket } from '$lib/track';
 	import { untrack } from 'svelte';
 	import SplitFlapBoard from './SplitFlapBoard.svelte';
 	import CountdownTimer from './CountdownTimer.svelte';
@@ -61,6 +67,7 @@
 	let alerts = $state<Alert[]>(normalizeAlerts(untrack(() => initialAlerts)));
 	let showSettings = $state(false);
 	let fetchError = $state(false);
+	let loaded = $state(false);
 
 	function greeting(): string {
 		const h = torontoHour();
@@ -115,9 +122,12 @@
 			if (controller.signal.aborted) return;
 			departures = result.departures;
 			fetchError = false;
+			loaded = true;
 		} catch (err) {
 			if (controller.signal.aborted) return;
 			fetchError = true;
+			loaded = true;
+			track('error_viewed', { error_type: 'fetch_departures', surface: 'commute' });
 			console.error('Failed to load departures:', err);
 		}
 	}
@@ -173,9 +183,12 @@
 
 		const hasSavedTrips = !!(commuteTrips.toWork || commuteTrips.toHome);
 
+		track('landing_viewed', { entry_type: hasSavedTrips ? 'home' : 'setup' });
+
 		// If no URL params but store has saved trips, redirect to the active trip URL
 		// Delay mounted until after goto to avoid flashing CommuteSetup
 		if (!urlTrip && hasSavedTrips) {
+			track('commute_loaded', { load_method: 'auto' });
 			const dir = getActiveDirection(null, commuteTrips);
 			const trip = dir === 'toWork' ? commuteTrips.toWork : commuteTrips.toHome;
 			if (trip) {
@@ -236,6 +249,43 @@
 			void loadDepartures();
 		}
 		prevNext = nextDeparture;
+	});
+
+	// Analytics: countdown_viewed — fire once per session when first valid countdown renders
+	$effect(() => {
+		if (nextDeparture && mounted) {
+			const displayTime = departureDisplayTime(nextDeparture);
+			const now = torontoNow();
+			const targetMs = departureTargetMs(displayTime, now);
+			const minutes = Math.max(0, Math.floor((targetMs - now.ms) / 60_000));
+			trackCountdownViewed({
+				station: activeTrip?.originName ?? '',
+				lead_time_bucket: getLeadTimeBucket(minutes),
+				minutes_to_departure: minutes,
+				countdown_source: 'home_flow'
+			});
+		}
+	});
+
+	// Analytics: empty_state_viewed — fire when no departures after data loads
+	let emptyStateTracked = false;
+	$effect(() => {
+		if (
+			loaded &&
+			mounted &&
+			activeTrip &&
+			!fetchError &&
+			departures.length === 0 &&
+			!emptyStateTracked
+		) {
+			emptyStateTracked = true;
+			track('empty_state_viewed', {
+				station: activeTrip.originName,
+				empty_reason: 'no_departures',
+				surface: 'commute'
+			});
+		}
+		if (departures.length > 0) emptyStateTracked = false;
 	});
 
 	// Pass empty array — AlertBanner shows all alerts when no route filter is provided

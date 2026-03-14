@@ -56,9 +56,10 @@
 			destinationCode: homeDest.code || homeDest.id,
 			destinationName: homeDest.name
 		});
-		track('commute-setup-complete', {
-			workOrigin: workOrigin.name,
-			workDest: workDest.name
+		track('saved_commute', {
+			origin_station: workOrigin.name,
+			destination_station: workDest.name,
+			save_type: 'commute_profile'
 		});
 		// Navigate to the saved trip URL — URL is the single source of truth
 		const from = workOrigin.code || workOrigin.id;
@@ -92,6 +93,10 @@
 						placeholder="Origin station"
 						onSelect={(s) => {
 							workOrigin = s;
+							track('station_selected', {
+								station: s.name,
+								selection_method: 'search'
+							});
 						}}
 					/>
 				</div>
@@ -103,6 +108,10 @@
 						placeholder="Destination station"
 						onSelect={(s) => {
 							workDest = s;
+							track('station_selected', {
+								station: s.name,
+								selection_method: 'search'
+							});
 						}}
 					/>
 				</div>
@@ -127,6 +136,10 @@
 						placeholder="Origin station"
 						onSelect={(s) => {
 							homeOrigin = s;
+							track('station_selected', {
+								station: s.name,
+								selection_method: 'search'
+							});
 						}}
 					/>
 				</div>
@@ -138,6 +151,10 @@
 						placeholder="Destination station"
 						onSelect={(s) => {
 							homeDest = s;
+							track('station_selected', {
+								station: s.name,
+								selection_method: 'search'
+							});
 						}}
 					/>
 				</div>
