@@ -19,9 +19,17 @@ export function getSseUrl(): string {
 }
 
 export async function proxyFetch(path: string): Promise<Response> {
-	const res = await fetch(`${getBaseUrl()}${path}`, {
-		signal: AbortSignal.timeout(10000)
-	});
+	let res: globalThis.Response;
+	try {
+		res = await fetch(`${getBaseUrl()}${path}`, {
+			signal: AbortSignal.timeout(10000)
+		});
+	} catch (err) {
+		if (err instanceof DOMException && err.name === 'TimeoutError') {
+			throw error(504, 'upstream timeout');
+		}
+		throw error(502, 'upstream unavailable');
+	}
 	if (!res.ok) {
 		throw error(res.status, await res.text());
 	}

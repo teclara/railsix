@@ -115,7 +115,9 @@
 			track('error_viewed', {
 				error_type: 'fetch_departures',
 				surface: 'departures',
-				station: data.stationCode
+				station: data.stationCode,
+				error_detail:
+					err instanceof Error ? err.message : 'unknown'
 			});
 			console.error('Failed to load departures:', err);
 		}

@@ -113,22 +113,37 @@
 		const controller = new AbortController();
 		loadController = controller;
 
-		try {
-			const result = await fetchDepartures(
-				trip.originCode,
-				trip.destinationCode,
-				controller.signal
-			);
-			if (controller.signal.aborted) return;
-			departures = result.departures;
-			fetchError = false;
-			loaded = true;
-		} catch (err) {
-			if (controller.signal.aborted) return;
-			fetchError = true;
-			loaded = true;
-			track('error_viewed', { error_type: 'fetch_departures', surface: 'commute' });
-			console.error('Failed to load departures:', err);
+		for (let attempt = 0; attempt < 2; attempt++) {
+			try {
+				const result = await fetchDepartures(
+					trip.originCode,
+					trip.destinationCode,
+					controller.signal
+				);
+				if (controller.signal.aborted) return;
+				departures = result.departures;
+				fetchError = false;
+				loaded = true;
+				return;
+			} catch (err) {
+				if (controller.signal.aborted) return;
+				if (attempt === 0) {
+					await new Promise((r) => setTimeout(r, 1500));
+					if (controller.signal.aborted) return;
+					continue;
+				}
+				fetchError = true;
+				loaded = true;
+				track('error_viewed', {
+					error_type: 'fetch_departures',
+					surface: 'commute',
+					origin: trip.originCode,
+					destination: trip.destinationCode,
+					error_detail:
+						err instanceof Error ? err.message : 'unknown'
+				});
+				console.error('Failed to load departures:', err);
+			}
 		}
 	}
 
