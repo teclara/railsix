@@ -139,8 +139,7 @@
 					surface: 'commute',
 					origin: trip.originCode,
 					destination: trip.destinationCode,
-					error_detail:
-						err instanceof Error ? err.message : 'unknown'
+					error_detail: err instanceof Error ? err.message : 'unknown'
 				});
 				console.error('Failed to load departures:', err);
 			}
